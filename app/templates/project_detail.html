@@ -1,0 +1,1968 @@
+{% extends "base.html" %}
+
+{% block topbar %}
+<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;min-width:0;">
+  <div style="min-width:0;flex:1;">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:3px;display:flex;align-items:center;gap:4px;">
+      <a href="/" style="color:#94a3b8;text-decoration:none;" onmouseover="this.style.color='#0f172a'" onmouseout="this.style.color='#94a3b8'">Projects</a>
+      <span style="opacity:0.4;">/</span>
+      <span style="color:#0f172a;font-weight:600;">{{ project.name }}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:380px;" title="{{ project.base_url }}">{{ project.base_url }}</div>
+      <a href="{{ project.base_url }}" target="_blank" rel="noopener" style="color:#94a3b8;flex-shrink:0;" title="Open site">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+      </a>
+      <span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700;">Active</span>
+    </div>
+    <!-- Status pills -->
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f1f5f9;color:#475569;">
+        🕷️ Last Crawl: {{ last_crawled_ago }}
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#fff7ed;color:#c2410c;">
+        ⚡ Automation: Manual
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f0f9ff;color:#0369a1;">
+        ⚡ Next: Not scheduled
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f8fafc;color:#94a3b8;">
+        🛡️ Firecrawl: Not configured
+      </span>
+      <a href="/projects/{{ project.id }}/visibility" title="Our own metric, computed from Google's real AI Overview citation data (see /visibility) -- not a number Google reports" style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-decoration:none;{% if not ai_visibility.has_data %}background:#f8fafc;color:#94a3b8;{% elif ai_visibility.score >= 50 %}background:#dcfce7;color:#15803d;{% else %}background:#fee2e2;color:#dc2626;{% endif %}">
+        🤖 AI Visibility: {% if ai_visibility.has_data %}{{ "%.0f"|format(ai_visibility.score) }}%{% else %}No data yet{% endif %}
+      </a>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+    <!-- Business profile -->
+    <button onclick="openDrawer('profile-drawer')" title="Business profile — context for AI suggestions"
+      style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+      onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+      <span style="width:7px;height:7px;border-radius:50%;background:{{ '#22c55e' if profile and profile.brand else '#cbd5e1' }};flex-shrink:0;"></span>
+      🏢 Business Profile
+    </button>
+    <!-- Crawl + settings -->
+    <div style="display:flex;align-items:center;gap:1px;">
+      {% if crawler_enabled %}
+      <form id="crawl-form" method="post" action="/projects/{{ project.id }}/crawl" style="display:inline;">
+        <button type="submit" id="crawl-btn"
+          style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px 0 0 6px;border:1px solid #e2e8f0;border-right:none;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+          onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+          Crawl
+        </button>
+      </form>
+      {% endif %}
+      <button onclick="openDrawer('history-drawer');loadRevisionHistory();" title="Revision history"
+        style="display:flex;align-items:center;justify-content:center;width:30px;height:31px;border:1px solid #e2e8f0;border-right:none;background:#fff;color:#64748b;cursor:pointer;transition:background 0.15s;"
+        onmouseover="this.style.background='#f8fafc';this.style.color='#4f46e5'" onmouseout="this.style.background='#fff';this.style.color='#64748b'">
+        <span style="font-size:13px;">📜</span>
+      </button>
+      <button onclick="openDrawer('queue-drawer')" title="Job queue" id="queue-btn"
+        style="position:relative;display:flex;align-items:center;justify-content:center;width:30px;height:31px;border:1px solid #e2e8f0;border-right:none;background:#fff;color:#64748b;cursor:pointer;transition:background 0.15s;"
+        onmouseover="this.style.background='#f8fafc';this.style.color='#4f46e5'" onmouseout="this.style.background='#fff';this.style.color='#64748b'">
+        <span style="font-size:13px;">📦</span>
+        <span id="queue-badge" style="display:none;position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#4f46e5;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;box-shadow:0 1px 4px rgba(79,70,229,.4);"></span>
+      </button>
+      <button onclick="openDrawer('settings-drawer')" title="Crawler settings"
+        style="display:flex;align-items:center;justify-content:center;width:30px;height:31px;border-radius:0 6px 6px 0;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:background 0.15s;"
+        onmouseover="this.style.background='#f8fafc';this.style.color='#4f46e5'" onmouseout="this.style.background='#fff';this.style.color='#64748b'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      </button>
+    </div>
+    <form id="audit-form" method="post" action="/projects/{{ project.id }}/audit" style="display:inline;">
+      <button type="submit"
+        style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(79,70,229,0.25);transition:opacity 0.15s,box-shadow 0.15s;"
+        onmouseover="this.style.boxShadow='0 4px 12px rgba(79,70,229,0.4)'" onmouseout="this.style.boxShadow='0 1px 4px rgba(79,70,229,0.25)'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        Run Audit
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Computed values ─────────────────────────────── #}
+{% set total_pages = pages|length %}
+{% set ti = namespace(n=0) %}
+{% set ci = namespace(n=0) %}
+{% set wi = namespace(n=0) %}
+{% set pf = namespace(n=0) %}
+{% for cat, issues in grouped_issues.items() %}
+  {% for i in issues %}
+    {% set ti.n = ti.n + 1 %}
+    {% if i.severity == 'error' %}{% set ci.n = ci.n + 1 %}{% endif %}
+    {% if i.severity == 'warning' %}{% set wi.n = wi.n + 1 %}{% endif %}
+  {% endfor %}
+{% endfor %}
+{% for pd in page_data %}
+  {% for s in pd.suggestions %}{% set pf.n = pf.n + 1 %}{% endfor %}
+{% endfor %}
+{% set pw = namespace(n=0) %}
+{# Only score_eligible issues count a page as unhealthy here -- a page with
+   nothing but informational findings (missing canonical/OG/Twitter tag,
+   etc; see audit_classification.RULES) shouldn't read as "has issues". #}
+{% for p in pages %}{% if p.issues|selectattr('score_eligible')|list|length > 0 %}{% set pw.n = pw.n + 1 %}{% endif %}{% endfor %}
+{% set health = ((total_pages - pw.n) / total_pages * 100)|int if total_pages > 0 else 0 %}
+
+<style>
+  /* ── KPI cards ── */
+  .kpi-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; position:relative; overflow:hidden; transition:transform .2s ease, box-shadow .2s ease; cursor:default; }
+  .kpi-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.08); }
+  .kpi-card-icon { position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .kpi-number { font-size:28px; font-weight:800; line-height:1; margin:8px 0 4px; letter-spacing:-0.02em; }
+  .kpi-label { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.07em; }
+  .kpi-sub { font-size:11px; color:#94a3b8; margin-top:3px; }
+
+  /* ── Issues accordion ── */
+  details.ig { margin-bottom:5px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; background:#fff; transition:box-shadow .2s; }
+  details.ig[open] { box-shadow:0 4px 16px rgba(0,0,0,0.06); }
+  details.ig summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:12px 16px; user-select:none; background:#fff; transition:background .15s; }
+  details.ig summary::-webkit-details-marker { display:none; }
+  details.ig summary:hover { background:#f8fafc; }
+  details.ig[open] summary { background:#f8faff; border-bottom:1px solid #e0e7ff; }
+  details.ig summary .caret { transition:transform .2s; flex-shrink:0; }
+  details.ig[open] summary .caret { transform:rotate(90deg); }
+  .ig-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .ig-table th { padding:8px 16px; text-align:left; font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid #f1f5f9; background:#fafafa; }
+  .ig-table td { padding:9px 16px; border-bottom:1px solid #f8fafc; vertical-align:middle; }
+  .ig-table tr:last-child td { border-bottom:none; }
+  .ig-table tr:hover td { background:#f8fafc; }
+
+  /* ── Drawer ── */
+  #drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(15,23,42,.25); z-index:400; backdrop-filter:blur(2px); }
+  .vtx-drawer { position:fixed; top:0; right:0; width:500px; max-width:95vw; height:100vh; background:#fff; box-shadow:-8px 0 40px rgba(0,0,0,.14); z-index:401; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .28s cubic-bezier(.4,0,.2,1); }
+  .vtx-drawer.open { transform:translateX(0); }
+  .drawer-head { padding:18px 20px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .drawer-body { flex:1; overflow-y:auto; padding:16px 20px; }
+  .drawer-foot { padding:14px 20px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; flex-shrink:0; }
+  .dsec summary { list-style:none; display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:#0f172a; padding:10px 0; cursor:pointer; user-select:none; border-bottom:1px solid #f1f5f9; margin-bottom:12px; }
+  .dsec summary::-webkit-details-marker { display:none; }
+  .dsec summary .dc { transition:transform .2s; margin-left:auto; color:#94a3b8; }
+  .dsec[open] summary .dc { transform:rotate(90deg); }
+  .drow { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .drow label { font-size:12px; color:#475569; font-weight:500; }
+  .dinput { font-size:12px; padding:5px 10px; border:1px solid #e2e8f0; border-radius:6px; color:#0f172a; outline:none; background:#fff; transition:border-color .15s; }
+  .dinput:focus { border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.1); }
+  .dselect { font-size:12px; padding:5px 10px; border:1px solid #e2e8f0; border-radius:6px; color:#0f172a; outline:none; background:#fff; cursor:pointer; }
+  /* Toggle switch */
+  .tog { position:relative; width:38px; height:21px; flex-shrink:0; }
+  .tog input { opacity:0; width:0; height:0; }
+  .tog-s { position:absolute; inset:0; border-radius:21px; background:#e2e8f0; cursor:pointer; transition:background .2s; }
+  .tog-s::before { content:''; position:absolute; width:17px; height:17px; border-radius:50%; background:#fff; left:2px; top:2px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+  .tog input:checked + .tog-s { background:#4f46e5; }
+  .tog input:checked + .tog-s::before { transform:translateX(17px); }
+  /* Chip */
+  .chip { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; padding:3px 8px; border-radius:10px; }
+
+  /* ── Toasts ── */
+  #toast-wrap { position:fixed; bottom:24px; right:24px; z-index:500; display:flex; flex-direction:column; gap:8px; }
+  .vtx-toast { display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:10px; background:#0f172a; color:#fff; font-size:13px; font-weight:500; box-shadow:0 8px 24px rgba(0,0,0,.2); transform:translateX(calc(100% + 28px)); transition:transform .3s cubic-bezier(.4,0,.2,1); min-width:220px; max-width:320px; }
+  .vtx-toast.show { transform:translateX(0); }
+  .vtx-toast.success { background:linear-gradient(135deg,#15803d,#16a34a); }
+  .vtx-toast.info { background:linear-gradient(135deg,#1d4ed8,#4f46e5); }
+  .vtx-toast.warn { background:linear-gradient(135deg,#b45309,#d97706); }
+
+  /* ── Queue badge pulse ── */
+  @keyframes badgePulse { 0%,100%{ box-shadow:0 0 0 0 rgba(79,70,229,.5) } 50%{ box-shadow:0 0 0 4px rgba(79,70,229,0) } }
+  .q-badge { animation:badgePulse 2s infinite; }
+
+  /* ── Range slider ── */
+  .vtx-range { -webkit-appearance:none; width:100%; height:4px; border-radius:4px; background:#e2e8f0; outline:none; }
+  .vtx-range::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#4f46e5; cursor:pointer; box-shadow:0 1px 4px rgba(79,70,229,.4); }
+
+  /* ── Progress ring ── */
+  .prog-ring { transform:rotate(-90deg); }
+
+  /* ── Animated counter ── */
+  @keyframes countUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .kpi-number { animation:countUp .4s ease both; }
+
+  /* ── Workflow stepper ── */
+  .stp-done { width:36px;height:36px;border-radius:50%;border:2px solid #22c55e;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .stp-active { width:36px;height:36px;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px rgba(79,70,229,.13); }
+  .stp-future { width:36px;height:36px;border-radius:50%;border:2px solid #e2e8f0;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .stp-conn { flex:1;border-top:2px dashed #e2e8f0;margin:0 6px;margin-top:18px; }
+
+  /* ── Optimization dropdown panel ── */
+  .opt-panel-row { display:none; }
+  .opt-panel-row.opt-open { display:table-row; }
+  .opt-grid { display:grid;grid-template-columns:1fr 1fr 1fr 0.5fr 0.5fr 0.5fr; }
+  .opt-col { padding:13px 14px;border-right:1px solid #f1f5f9;min-width:0;overflow:hidden; }
+  .opt-col:last-child { border-right:none; }
+  .opt-col-narrow { padding-left:8px;padding-right:8px; }
+  .opt-hdr { font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px; }
+  .opt-gen-btn { width:100%;background:#4f46e5;color:#fff;font-size:10px;font-weight:700;padding:6px 8px;border-radius:7px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:opacity .15s; }
+  .opt-gen-btn:hover { opacity:.87; }
+  .opt-action-btn { display:flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:6px 10px;border-radius:7px;font-size:10px;font-weight:600;cursor:pointer;transition:opacity .12s; }
+  .opt-action-btn:hover { opacity:.85; }
+  .opt-chk { width:14px;height:14px;border-radius:50%;background:#10b981;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .opt-row-toggle { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#4f46e5;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap; }
+  .opt-row-toggle:hover { background:#eef2ff; }
+  .opt-row-toggle.open { background:#4f46e5;color:#fff;border-color:#4f46e5; }
+</style>
+
+{# ── Stepper + KPI Cards (combined) ─────────────── #}
+<div style="padding:18px 24px 20px;border-bottom:1px solid #e2e8f0;background:#fff;">
+
+  <!-- 6-step workflow stepper -->
+  <div style="display:flex;align-items:flex-start;">
+
+    <!-- Step 1: Current — Done -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:90px;">
+      <div class="stp-done">
+        <svg viewBox="0 0 16 12" fill="none" width="13" height="11">
+          <path d="M1.5 6L5.5 10L14.5 1.5" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:700;color:#16a34a;line-height:1.3;">Current</div>
+        <div style="font-size:10px;color:#94a3b8;line-height:1.3;">See existing</div>
+      </div>
+    </div>
+    <div class="stp-conn"></div>
+
+    <!-- Step 2: AI Suggestion — Active -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:100px;">
+      <div class="stp-active">
+        <span style="color:#fff;font-size:13px;font-weight:800;line-height:1;">2</span>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:700;color:#4f46e5;line-height:1.3;">AI Suggestion</div>
+        <div style="font-size:10px;color:#a5b4fc;line-height:1.3;">Generate fixes</div>
+      </div>
+    </div>
+    <div class="stp-conn"></div>
+
+    <!-- Step 3: Rule Validation — Future -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:100px;">
+      <div class="stp-future">
+        <span style="color:#cbd5e1;font-size:13px;font-weight:700;line-height:1;">3</span>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;line-height:1.3;">Rule Validation</div>
+        <div style="font-size:10px;color:#cbd5e1;line-height:1.3;">Check by rules</div>
+      </div>
+    </div>
+    <div class="stp-conn"></div>
+
+    <!-- Step 4: LLM Judge — Future -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:88px;">
+      <div class="stp-future">
+        <span style="color:#cbd5e1;font-size:13px;font-weight:700;line-height:1;">4</span>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;line-height:1.3;">LLM Judge</div>
+        <div style="font-size:10px;color:#cbd5e1;line-height:1.3;">AI quality score</div>
+      </div>
+    </div>
+    <div class="stp-conn"></div>
+
+    <!-- Step 5: AI Visibility — Future -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:98px;">
+      <div class="stp-future">
+        <span style="color:#cbd5e1;font-size:13px;font-weight:700;line-height:1;">5</span>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;line-height:1.3;">AI Visibility</div>
+        <div style="font-size:10px;color:#cbd5e1;line-height:1.3;">Track in AI models</div>
+      </div>
+    </div>
+    <div class="stp-conn"></div>
+
+    <!-- Step 6: Deploy — Future -->
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:76px;">
+      <div class="stp-future">
+        <span style="color:#cbd5e1;font-size:13px;font-weight:700;line-height:1;">6</span>
+      </div>
+      <div style="margin-top:5px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;color:#94a3b8;line-height:1.3;">Deploy</div>
+        <div style="font-size:10px;color:#cbd5e1;line-height:1.3;">Push to WordPress</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- KPI Cards — below stepper inside the same panel -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:18px;">
+
+    <!-- Site Health -->
+    <div class="kpi-card" style="border-left:4px solid #16a34a;background:linear-gradient(135deg,#fff 60%,#f0fdf4);">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#dcfce7;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/></svg>
+      </div>
+      <div class="kpi-label">Site Health</div>
+      <div class="kpi-number" style="color:{% if health >= 80 %}#15803d{% elif health >= 50 %}#a16207{% else %}#dc2626{% endif %};">{{ health }}%</div>
+      <div class="kpi-sub">{{ total_pages - pw.n }} / {{ total_pages }} clean pages</div>
+      <div style="margin-top:8px;height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:{{ health }}%;background:{% if health >= 80 %}#16a34a{% elif health >= 50 %}#d97706{% else %}#dc2626{% endif %};border-radius:4px;transition:width 1s ease;"></div>
+      </div>
+    </div>
+
+    <!-- Pages Crawled -->
+    <div class="kpi-card" style="border-left:4px solid #0284c7;background:linear-gradient(135deg,#fff 60%,#f0f9ff);">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#e0f2fe;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+      </div>
+      <div class="kpi-label">Pages Crawled</div>
+      <div class="kpi-number" style="color:#0284c7;">{{ total_pages }}</div>
+      <div class="kpi-sub">indexed pages</div>
+    </div>
+
+    <!-- Total Issues -->
+    <div class="kpi-card" style="border-left:4px solid #d97706;background:linear-gradient(135deg,#fff 60%,#fffbeb);">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
+      </div>
+      <div class="kpi-label">Total Issues</div>
+      <div class="kpi-number" style="color:{% if ti.n > 0 %}#b45309{% else %}#15803d{% endif %};">{{ ti.n }}</div>
+      <div class="kpi-sub">across all pages</div>
+    </div>
+
+    <!-- Critical Errors -->
+    <div class="kpi-card" style="border-left:4px solid #dc2626;background:linear-gradient(135deg,#fff 60%,#fef2f2);">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#fee2e2;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      </div>
+      <div class="kpi-label">Critical Errors</div>
+      <div class="kpi-number" style="color:{% if ci.n > 0 %}#dc2626{% else %}#15803d{% endif %};">{{ ci.n }}</div>
+      <div class="kpi-sub">need fix now</div>
+    </div>
+
+    <!-- Warnings -->
+    <div class="kpi-card" style="border-left:4px solid #ea580c;background:linear-gradient(135deg,#fff 60%,#fff7ed);">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#ffedd5;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+      </div>
+      <div class="kpi-label">Warnings</div>
+      <div class="kpi-number" style="color:{% if wi.n > 0 %}#c2410c{% else %}#15803d{% endif %};">{{ wi.n }}</div>
+      <div class="kpi-sub">opportunities</div>
+    </div>
+
+    <!-- AI Suggestions -->
+    <div class="kpi-card" style="border-left:4px solid #7c3aed;background:linear-gradient(135deg,#fff 60%,#faf5ff);cursor:pointer;" onclick="document.getElementById('audit-form').submit()">
+      <div class="kpi-icon" style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:#ede9fe;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>
+      </div>
+      <div class="kpi-label">AI Suggestions</div>
+      <div class="kpi-number" style="color:#7c3aed;">{{ pf.n }}</div>
+      <div class="kpi-sub">generated</div>
+    </div>
+
+  </div>
+
+</div>
+
+{% if grouped_issues %}
+<div style="margin:0 24px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;">
+  <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:12px;">Issue breakdown by category</div>
+  {% set cat_colors = {'title':'#4f46e5','meta_description':'#0284c7','h1':'#7c3aed','h2':'#7c3aed','image_alt':'#0891b2','canonical':'#b45309','opengraph':'#c026d3','twitter':'#1d4ed8','content':'#d97706','schema':'#4f46e5','lang':'#4f46e5'} %}
+  {% set max_count = grouped_issues.values()|map('length')|max %}
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    {% for category, issues in grouped_issues.items() %}
+    {% set accent = cat_colors.get(category, '#4f46e5') %}
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:120px;flex-shrink:0;font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ category|replace('_',' ')|title }}</div>
+      <div style="flex:1;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:{{ (issues|length / max_count * 100)|round(1) }}%;background:{{ accent }};border-radius:4px;"></div>
+      </div>
+      <div style="width:24px;flex-shrink:0;text-align:right;font-size:11px;font-weight:700;color:#0f172a;">{{ issues|length }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Backlinks (Task 5.1 + 5.2) ───────────────────── #}
+<div id="backlinks" style="margin:0 0 20px;padding:16px 18px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;scroll-margin-top:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:13px;font-weight:700;color:#0f172a;">🔗 Backlink Analytics</span>
+      <span id="bl-source-badge" style="display:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#374151;">
+        <input type="checkbox" id="bl-sched-enabled"> Weekly auto-pull
+      </label>
+      <button onclick="saveBacklinkSchedule()" style="padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+      <button onclick="refreshBacklinks()" id="bl-refresh-btn" style="padding:5px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:700;cursor:pointer;">Refresh now</button>
+    </div>
+  </div>
+
+  <div id="bl-body" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">
+    <div style="grid-column:1/-1;font-size:12px;color:#94a3b8;">Loading…</div>
+  </div>
+
+  <div id="bl-extras" style="display:none;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Referring TLDs</div>
+      <div id="bl-tld-bars"></div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Linking Site Types</div>
+      <div id="bl-platform-bars"></div>
+    </div>
+  </div>
+
+  <details class="ig" id="bl-records-details" style="border:1px solid #e2e8f0;">
+    <summary style="padding:8px 12px;">
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#0f172a;flex:1;">Backlink list</span>
+      <span id="bl-records-count" style="font-size:11px;color:#94a3b8;"></span>
+    </summary>
+    <div style="padding:12px;">
+      <div style="display:flex;gap:2px;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:10px;max-width:280px;">
+        {% for t in ['active','new','lost'] %}
+        <button onclick="switchBlTab(this,'{{ t }}')" data-bltab="{{ t }}"
+          style="flex:1;padding:5px 8px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer;{% if loop.first %}background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(0,0,0,.07);{% else %}background:transparent;color:#64748b;{% endif %}">
+          {{ t|title }}
+        </button>
+        {% endfor %}
+      </div>
+      <div id="bl-records-body" style="font-size:12px;color:#94a3b8;">Loading…</div>
+    </div>
+  </details>
+</div>
+
+{# ── Issues by Category ──────────────────────────── #}
+{% if grouped_issues %}
+<div style="padding:20px 24px 32px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+    <div style="width:28px;height:28px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"/></svg>
+    </div>
+    <span style="font-size:15px;font-weight:700;color:#0f172a;">🗂️ Issues by category</span>
+    <span style="font-size:11px;background:#eef2ff;color:#4f46e5;padding:2px 9px;border-radius:10px;font-weight:700;">{{ grouped_issues|length }}</span>
+    <span style="font-size:11px;color:#94a3b8;margin-left:auto;">{{ ti.n }} total issues across {{ total_pages }} pages</span>
+  </div>
+
+  {% set cat_colors = {
+    'title': '#4f46e5',
+    'meta_description': '#0284c7',
+    'h1': '#7c3aed',
+    'h2': '#6d28d9',
+    'image_alt': '#0891b2',
+    'schema': '#15803d',
+    'canonical': '#b45309',
+    'opengraph': '#c026d3',
+    'twitter': '#1d4ed8',
+    'lang': '#16a34a',
+    'content': '#d97706',
+  } %}
+  {% set cat_labels = {
+    'title': '📝 Meta Title',
+    'meta_description': '📄 Meta Description',
+    'h1': '🔠 H1 Heading',
+    'h2': '🔤 H2 Tags',
+    'image_alt': '🖼️ Image Alt Text',
+    'schema': '🧩 Schema Markup',
+    'canonical': '🔗 Canonical Link',
+    'opengraph': '📱 Open Graph',
+    'twitter': '🐦 Twitter Card',
+    'lang': '🌐 Lang Attribute',
+    'content': '✍️ Content Quality',
+  } %}
+
+  {% for category, issues in grouped_issues.items() %}
+  {% set err_n = issues|selectattr('severity','eq','error')|list|length %}
+  {% set warn_n = issues|selectattr('severity','eq','warning')|list|length %}
+  {% set accent = cat_colors.get(category, '#4f46e5') %}
+  {% set label = cat_labels.get(category, category|replace('_',' ')|title) %}
+  {% set uid_seen = namespace(ids=[]) %}
+  {% set upage_n = namespace(n=0) %}
+  {% for i in issues %}
+    {% if i.page.id not in uid_seen.ids %}
+      {% set uid_seen.ids = uid_seen.ids + [i.page.id] %}
+      {% set upage_n.n = upage_n.n + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  <details class="ig" style="border-left:3px solid {{ accent }};">
+    <summary>
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      <span style="width:8px;height:8px;border-radius:50%;background:{{ accent }};flex-shrink:0;"></span>
+      <span style="font-size:13px;font-weight:600;color:#0f172a;flex:1;">{{ label }}</span>
+      <span style="font-size:11px;color:#94a3b8;margin-right:12px;">{{ upage_n.n }}/{{ total_pages }} pages</span>
+      {% if err_n > 0 %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;font-weight:700;margin-right:4px;">{{ err_n }} error{% if err_n != 1 %}s{% endif %}</span>{% endif %}
+      {% if warn_n > 0 %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fef9c3;color:#a16207;font-weight:700;margin-right:8px;">{{ warn_n }} warning{% if warn_n != 1 %}s{% endif %}</span>{% endif %}
+      <span style="font-size:11px;font-weight:600;color:{{ accent }};padding:3px 10px;border-radius:5px;border:1px solid;border-color:{{ accent }}20;background:{{ accent }}10;white-space:nowrap;">View tasks</span>
+    </summary>
+    <table class="ig-table">
+      <thead>
+        <tr>
+          <th style="width:28%">🌐 Page</th>
+          <th>Issue</th>
+          <th style="width:26%">Currently Displayed</th>
+          <th style="width:90px">Severity</th>
+          <th style="width:130px;text-align:right;padding-right:14px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in issues %}
+        {% set rid = 'opt-' ~ category ~ '-' ~ loop.index %}
+        <tr style="cursor:default;">
+          <td style="font-size:11px;color:#64748b;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ issue.page.url }}">{{ issue.page.url }}</td>
+          <td style="font-size:11px;color:#0f172a;">{{ issue.message }}</td>
+          {% set current_display = current_value_display(issue.page, category) %}
+          <td style="font-size:11px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ '#cbd5e1' if current_display == '-Blank-' else '#374151' }};{{ 'font-style:italic;' if current_display == '-Blank-' }}" title="{{ current_display }}">{{ current_display }}</td>
+          <td>
+            {% if issue.severity == 'error' %}
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;font-weight:700;">Error</span>
+            {% else %}
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fef9c3;color:#a16207;font-weight:700;">Warning</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;padding-right:14px;">
+            <div style="display:inline-flex;align-items:center;gap:5px;">
+              <button id="btn-{{ rid }}" onclick="toggleOptPanel('{{ rid }}')"
+                style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#4f46e5;cursor:pointer;white-space:nowrap;transition:background .12s,color .12s;"
+                onmouseover="this.style.background='#eef2ff'" onmouseout="if(!this.classList.contains('opt-btn-open'))this.style.background='#fff'">▼ Optimize</button>
+            </div>
+          </td>
+        </tr>
+        {# ── Inline optimization panel (hidden by default) ── #}
+        <tr id="{{ rid }}" style="display:none;">
+          <td colspan="5" style="padding:0;border-bottom:2px solid #e0e7ff;">
+            <div class="opt-grid" style="background:#fafbfc;border-top:1px solid #e0e7ff;">
+
+              {# Col 1: CURRENT — actual page value only, never the audit's description of the issue #}
+              {% set current = current_value_for(issue.page, category) %}
+              <div class="opt-col">
+                <div class="opt-hdr">Current</div>
+
+                {% if current.kind == 'text' %}
+                <div style="font-size:12px;font-weight:700;color:#0f172a;line-height:1.4;word-break:break-word;">{{ current.value or 'Not set' }}</div>
+
+                {% elif current.kind == 'list' %}
+                  {% for item in current['items'][:3] %}
+                <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;word-break:break-word;">{{ item }}</div>
+                  {% else %}
+                <div style="font-size:12px;color:#94a3b8;">Not set</div>
+                  {% endfor %}
+                  {% if current['items']|length > 3 %}
+                <div style="font-size:10px;color:#94a3b8;">+{{ current['items']|length - 3 }} more</div>
+                  {% endif %}
+
+                {% elif current.kind == 'kv' %}
+                  {% for label, value in current['items'] %}
+                <div style="margin-bottom:6px;">
+                  <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">{{ label }}</div>
+                  <div style="font-size:12px;color:#0f172a;line-height:1.35;word-break:break-word;">{{ value or '—' }}</div>
+                </div>
+                  {% endfor %}
+
+                {% elif current.kind == 'images' %}
+                  {% if current['items'] %}
+                <div style="max-height:120px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:7px;">
+                    {% for img in current['items'] %}
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-bottom:1px solid #f8fafc;">
+                    <code style="font-size:9px;color:#64748b;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;" title="{{ img.src or '' }}">{{ (img.src or '?').split('/')[-1] }}</code>
+                    {% if img.alt %}
+                    <span style="font-size:10px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%;" title="{{ img.alt }}">{{ img.alt }}</span>
+                    {% else %}
+                    <span style="font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 6px;border-radius:8px;flex-shrink:0;">Missing</span>
+                    {% endif %}
+                  </div>
+                    {% endfor %}
+                </div>
+                  {% else %}
+                <div style="font-size:12px;color:#94a3b8;">No images found</div>
+                  {% endif %}
+
+                {% elif current.kind == 'schema' %}
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;">
+                  {% for t in current.types %}
+                  <span class="chip" style="background:#eef2ff;color:#4f46e5;">{{ t }}</span>
+                  {% else %}
+                  <span style="font-size:12px;color:#94a3b8;">No structured data detected</span>
+                  {% endfor %}
+                </div>
+                  {% if current.raw %}
+                <details>
+                  <summary style="font-size:10px;color:#4f46e5;font-weight:600;cursor:pointer;list-style:none;">▸ View raw JSON</summary>
+                  <pre style="font-size:9px;color:#475569;background:#f1f5f9;border-radius:6px;padding:8px;margin-top:6px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-all;">{{ current.raw | tojson(indent=2) }}</pre>
+                </details>
+                  {% endif %}
+
+                {% elif current.kind == 'markdown' %}
+                  {% set is_long = current.full|length > 400 %}
+                <div id="cv-excerpt-{{ rid }}" style="font-size:11px;color:#374151;line-height:1.5;white-space:pre-wrap;word-break:break-word;">{{ current.excerpt or 'No content extracted' }}{% if is_long %}…{% endif %}</div>
+                  {% if is_long %}
+                <div id="cv-full-{{ rid }}" style="display:none;font-size:11px;color:#374151;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow-y:auto;margin-top:4px;">{{ current.full }}</div>
+                <a href="#" id="cv-toggle-{{ rid }}" onclick="toggleCurrentMore('{{ rid }}');return false;" style="font-size:10px;color:#4f46e5;font-weight:600;text-decoration:none;margin-top:6px;display:inline-block;">Show more</a>
+                  {% endif %}
+                {% endif %}
+
+                <div style="margin-top:8px;background:#f1f5f9;border-radius:7px;padding:6px 8px;">
+                  <code style="font-size:9px;color:#64748b;font-family:monospace;word-break:break-all;line-height:1.4;">{{ issue.page.url|truncate(52,true,'…') }}</code>
+                </div>
+              </div>
+
+              {# Col 2: AI SUGGESTIONS #}
+              <div class="opt-col">
+                <div class="opt-hdr" style="display:flex;align-items:center;gap:4px;">AI Suggestions
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" width="11" height="11"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <button class="opt-gen-btn" onclick="generateSugg('{{ rid }}', {{ project.id }}, {{ issue.page.id }}, {{ issue.issue_id }})">✦ Generate AI Suggestion</button>
+                <div id="sugg-{{ rid }}" style="margin-top:8px;text-align:center;padding:14px 0;">
+                  <div style="font-size:22px;margin-bottom:4px;">🤖</div>
+                  <div style="font-size:10px;color:#94a3b8;line-height:1.4;">Click to generate<br>AI suggestions for this issue</div>
+                </div>
+              </div>
+
+              {# Col 3: EDIT SUGGESTION #}
+              <div class="opt-col">
+                <div class="opt-hdr">Edit Suggestion</div>
+                <div style="position:relative;">
+                  <textarea id="ta-{{ rid }}" rows="4" data-category="{{ category }}" onblur="validateRule('{{ rid }}')"
+                    style="width:100%;font-size:11px;color:#374151;border:1px solid #e2e8f0;border-radius:7px;padding:8px 28px 8px 8px;resize:none;font-family:inherit;line-height:1.4;box-sizing:border-box;"
+                    placeholder="AI suggestion will appear here…"></textarea>
+                  <svg style="position:absolute;top:8px;right:8px;color:#94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap;">
+                  <button id="save-{{ rid }}" onclick="saveSuggEdit('{{ rid }}')"
+                    style="background:#4f46e5;color:#fff;font-size:10px;font-weight:700;padding:5px 14px;border-radius:6px;border:none;cursor:pointer;">Save</button>
+                  <button onclick="document.getElementById('ta-{{ rid }}').value=''"
+                    style="background:#fff;border:1px solid #e2e8f0;color:#374151;font-size:10px;font-weight:600;padding:5px 10px;border-radius:6px;cursor:pointer;">Cancel</button>
+                  <span id="ta-status-{{ rid }}"></span>
+                </div>
+              </div>
+
+              {# Col 4: RULE VALIDATION #}
+              <div class="opt-col opt-col-narrow">
+                <div class="opt-hdr">Rule Validation</div>
+                <div id="rule-{{ rid }}">
+                  {% if issue.severity == 'error' %}
+                  <span style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Failed</span>
+                  {% else %}
+                  <span style="display:inline-block;background:#fef9c3;color:#a16207;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Needs Review</span>
+                  {% endif %}
+                  <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+                    <div style="display:flex;align-items:center;gap:5px;">
+                      <div style="width:14px;height:14px;border-radius:50%;background:{% if issue.severity == 'error' %}#dc2626{% else %}#d97706{% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="8" height="8"><path stroke-linecap="round" stroke-linejoin="round" d="{% if issue.severity == 'error' %}M6 18L18 6M6 6l12 12{% else %}M12 9v3.75m0 3.75h.008v-.008H12v.008z{% endif %}"/></svg>
+                      </div>
+                      <span style="font-size:10px;color:#374151;">{{ issue.message|truncate(30,true,'…') }}</span>
+                    </div>
+                  </div>
+                  <div style="font-size:9px;color:#94a3b8;margin-top:8px;">Original issue &mdash; generate or edit a suggestion to re-check</div>
+                </div>
+                <a href="#" onclick="openRulesDrawer('{{ category }}', '{{ label }}');return false;" style="font-size:10px;color:#4f46e5;font-weight:600;text-decoration:none;margin-top:10px;display:inline-block;">View all rules</a>
+              </div>
+
+              {# Col 5: LLM Judge + AI Visibility Impact -- neither is built yet,
+                 collapsed into one muted chip instead of two panels of fake
+                 numbers ("Not Judged", "—/10", per-model "—") that implied
+                 working features. #}
+              <div class="opt-col opt-col-narrow">
+                <div class="opt-hdr">Judge &amp; Visibility Impact</div>
+                <span style="display:inline-block;background:#f1f5f9;color:#94a3b8;font-size:10px;font-weight:700;padding:4px 10px;border-radius:10px;">🔧 Coming soon</span>
+                <div style="font-size:9px;color:#94a3b8;margin-top:8px;line-height:1.4;">LLM-judged quality scores and per-model AI visibility impact aren't built yet.</div>
+              </div>
+
+              {# Col 7: ACTION #}
+              <div class="opt-col opt-col-narrow">
+                <div class="opt-hdr">Action</div>
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                  <button type="button" onclick="openPageModal({{ issue.page.id }}, {{ issue.issue_id }})"
+                    class="opt-action-btn"
+                    style="background:#4f46e5;color:#fff;border:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3"/></svg>
+                    Fix on Page
+                  </button>
+                  <button class="opt-action-btn" style="background:#fff;border:1px solid #e2e8f0;color:#374151;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><circle cx="12" cy="12" r="3" stroke-width="2"/></svg>
+                    Preview
+                  </button>
+                  <button class="opt-action-btn" style="background:#fff;border:1px solid #e2e8f0;color:#374151;"
+                    onclick="toggleOptPanel('{{ rid }}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                    Skip
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endfor %}
+</div>
+
+{# ── Page Content (Fit Markdown) — one per page, shown once below all issue categories ── #}
+{% set pages_with_content = pages|selectattr('fit_markdown')|list + pages|rejectattr('fit_markdown')|selectattr('custom_content')|list %}
+{% if pages_with_content %}
+<div style="padding:0 24px 32px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+    <div style="width:28px;height:28px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+    </div>
+    <span style="font-size:15px;font-weight:700;color:#0f172a;">Page content (Fit Markdown)</span>
+    <span style="font-size:11px;background:#eef2ff;color:#4f46e5;padding:2px 9px;border-radius:10px;font-weight:700;">{{ pages_with_content|length }}</span>
+  </div>
+  {% for page in pages_with_content %}
+  {% set content = page.fit_markdown or page.custom_content %}
+  <details style="margin-bottom:5px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;">
+    <summary style="font-size:12px;color:#4f46e5;font-weight:600;cursor:pointer;list-style:none;padding:10px 14px;">▸ {{ page.url }}</summary>
+    <div style="font-size:11px;color:#374151;line-height:1.5;white-space:pre-wrap;word-break:break-word;background:#f8fafc;padding:12px 14px;max-height:260px;overflow-y:auto;border-top:1px solid #f1f5f9;">{{ content[:1000] }}{% if content|length > 1000 %}…{% endif %}</div>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div style="padding:64px 24px;text-align:center;">
+  <div style="max-width:380px;margin:0 auto;">
+    <div style="font-size:48px;margin-bottom:16px;">{{ '🎉' if total_pages > 0 else '🕷️' }}</div>
+    <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">
+      {% if total_pages == 0 %}No pages crawled yet{% else %}No issues found — site is clean!{% endif %}
+    </div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:24px;">
+      {% if total_pages == 0 %}Click <strong>Crawl</strong> to discover pages, then <strong>Run Audit</strong>.{% else %}Click <strong>Run Audit</strong> to re-check {{ total_pages }} pages.{% endif %}
+    </div>
+    {% if total_pages == 0 %}
+      {% if crawler_enabled %}
+    <form method="post" action="/projects/{{ project.id }}/crawl" style="display:inline;">
+      <button type="submit" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.3);">Crawl Site</button>
+    </form>
+      {% else %}
+    <div style="font-size:12px;color:#94a3b8;">The crawler is disabled. Use <a href="/onpage-semrush" style="color:#4f46e5;">On-Page API</a> instead.</div>
+      {% endif %}
+    {% else %}
+    <form method="post" action="/projects/{{ project.id }}/audit" style="display:inline;" onsubmit="showToast('🔍 Audit started…','info')">
+      <button type="submit" style="padding:10px 24px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.3);">Run Audit</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Crawler Settings Drawer ─────────────────────── #}
+<div id="settings-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">Crawler Settings</div>
+        <div style="font-size:11px;color:#94a3b8;">{{ project.base_url }}</div>
+      </div>
+    </div>
+    <button onclick="closeDrawer('settings-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;" onmouseover="this.style.background='#fee2e2';this.style.color='#dc2626'" onmouseout="this.style.background='#f8fafc';this.style.color='#64748b'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+
+    <!-- 🕷️ Crawler -->
+    <details class="dsec" open>
+      <summary>🕷️ Crawler<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      <div class="drow"><label>User Agent</label><input id="cs-user-agent" class="dinput" style="width:200px;" value="{{ crawl_settings.user_agent }}" placeholder="Bot user agent"/></div>
+      <div class="drow"><label>Max Depth</label><input id="cs-max-depth" class="dinput" style="width:80px;" type="number" value="{{ crawl_settings.max_depth }}" min="1" max="10"/></div>
+      <div class="drow"><label>Crawl Delay (ms)</label><input id="cs-crawl-delay" class="dinput" style="width:80px;" type="number" value="{{ crawl_settings.crawl_delay_ms }}" min="0" step="100"/></div>
+      <div class="drow"><label>Timeout (s)</label><input id="cs-timeout" class="dinput" style="width:80px;" type="number" value="{{ crawl_settings.timeout_s }}"/></div>
+      <div class="drow">
+        <label>Respect robots.txt</label>
+        <label class="tog"><input id="cs-respect-robots" type="checkbox" {% if crawl_settings.respect_robots %}checked{% endif %}><span class="tog-s"></span></label>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;color:#475569;font-weight:500;display:block;margin-bottom:5px;">Exclude patterns</label>
+        <textarea id="cs-exclude-patterns" class="dinput" style="width:100%;height:60px;resize:vertical;font-family:monospace;font-size:11px;" placeholder="/admin/*&#10;/wp-json/*">{{ crawl_settings.exclude_patterns }}</textarea>
+      </div>
+    </details>
+
+    <!-- ⚡ Automation -->
+    <details class="dsec">
+      <summary>⚡ Automation<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      <div class="drow">
+        <label>Automatic Crawling</label>
+        <label class="tog"><input id="cs-enabled" type="checkbox" {% if crawl_settings.enabled %}checked{% endif %}><span class="tog-s"></span></label>
+      </div>
+      <div class="drow">
+        <label>Schedule</label>
+        <select id="cs-interval" class="dselect">
+          <option value="24h" {% if crawl_settings.interval == "24h" %}selected{% endif %}>Every 24 Hours</option>
+          <option value="12h" {% if crawl_settings.interval == "12h" %}selected{% endif %}>Every 12 Hours</option>
+          <option value="6h" {% if crawl_settings.interval == "6h" %}selected{% endif %}>Every 6 Hours</option>
+          <option value="weekly" {% if crawl_settings.interval == "weekly" %}selected{% endif %}>Weekly</option>
+          <option value="cron" {% if crawl_settings.interval == "cron" %}selected{% endif %}>Custom Cron</option>
+        </select>
+      </div>
+      <div class="drow"><label>Timezone</label>
+        <select id="cs-timezone" class="dselect">
+          <option value="UTC" {% if crawl_settings.timezone == "UTC" %}selected{% endif %}>UTC</option>
+          <option value="Asia/Kolkata" {% if crawl_settings.timezone == "Asia/Kolkata" %}selected{% endif %}>Asia/Kolkata</option>
+          <option value="America/New_York" {% if crawl_settings.timezone == "America/New_York" %}selected{% endif %}>America/New_York</option>
+          <option value="Europe/London" {% if crawl_settings.timezone == "Europe/London" %}selected{% endif %}>Europe/London</option>
+        </select>
+      </div>
+      <div class="drow"><label>Custom Cron</label><input id="cs-cron" class="dinput" style="width:140px;font-family:monospace;" placeholder="0 2 * * *" value="{{ crawl_settings.cron_expression or '' }}"/></div>
+      <div style="padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;">Preview</div>
+        {% if crawl_settings.next_run_at %}
+        <div style="font-size:12px;color:#4f46e5;font-weight:600;">Next: {{ crawl_settings.next_run_at }}</div>
+        {% else %}
+        <div style="font-size:12px;color:#94a3b8;font-weight:600;">Save with Automatic Crawling on to schedule a run.</div>
+        {% endif %}
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">The scheduler that acts on this isn't wired up yet (coming in a later task) -- saving persists your settings but won't trigger crawls on its own until then.</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px;">Last Crawl</div>
+          <div style="font-size:12px;font-weight:600;color:#0f172a;">{{ last_crawled_ago }}</div>
+        </div>
+        <div style="flex:1;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px;">Next Crawl</div>
+          <div style="font-size:12px;font-weight:600;color:#4f46e5;">{{ crawl_settings.next_run_at or "Not scheduled" }}</div>
+        </div>
+      </div>
+    </details>
+
+    <!-- ⚙️ Workers -->
+    <details class="dsec">
+      <summary>⚙️ Workers<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div><label style="font-size:11px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">Worker Count</label><input id="cs-worker-count" class="dinput" style="width:100%;" type="number" value="{{ crawl_settings.worker_count }}" min="1" max="20"/></div>
+        <div><label style="font-size:11px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">Concurrency</label><input id="cs-concurrency" class="dinput" style="width:100%;" type="number" value="{{ crawl_settings.concurrency }}" min="1" max="50"/></div>
+        <div><label style="font-size:11px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">Retry Attempts</label><input id="cs-retry-attempts" class="dinput" style="width:100%;" type="number" value="{{ crawl_settings.retry_attempts }}" min="0" max="10"/></div>
+        <div><label style="font-size:11px;color:#64748b;font-weight:500;display:block;margin-bottom:4px;">Timeout (s)</label><input id="cs-worker-timeout" class="dinput" style="width:100%;" type="number" value="{{ crawl_settings.worker_timeout_s }}"/></div>
+      </div>
+      <div style="margin-bottom:4px;font-size:11px;font-weight:600;color:#64748b;">Worker Health</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <span class="chip" style="background:#dcfce7;color:#15803d;">🟢 Healthy</span>
+        <span class="chip" style="background:#f1f5f9;color:#64748b;">3 workers</span>
+        <span class="chip" style="background:#dbeafe;color:#1d4ed8;">● Idle</span>
+      </div>
+    </details>
+
+    <!-- 🛡️ Verification -->
+    <details class="dsec">
+      <summary>🛡️ Verification<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      <div class="drow">
+        <label>Firecrawl Validation</label>
+        <label class="tog"><input id="cs-firecrawl-validation" type="checkbox" {% if crawl_settings.firecrawl_validation %}checked{% endif %}><span class="tog-s"></span></label>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <label style="font-size:12px;color:#475569;font-weight:500;">Coverage Target</label>
+          <span style="font-size:12px;font-weight:700;color:#0d9488;" id="cov-val">{{ crawl_settings.coverage_target }}%</span>
+        </div>
+        <input id="cs-coverage-target" type="range" class="vtx-range" min="50" max="100" value="{{ crawl_settings.coverage_target }}" oninput="document.getElementById('cov-val').textContent=this.value+'%'"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;">
+        <span style="font-size:18px;">🛡️</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#0d9488;">Not Configured</div>
+          <div style="font-size:11px;color:#64748b;">Add FIRECRAWL_API_KEY to activate</div>
+        </div>
+      </div>
+    </details>
+
+    <!-- 🔌 WordPress -->
+    <details class="dsec">
+      <summary>🔌 WordPress<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Connects via the AI SEO Connector plugin so accepted suggestions can be deployed straight to the site.</div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#475569;font-weight:500;display:block;margin-bottom:5px;">Site URL</label>
+        <input id="wp-site-url" class="dinput" style="width:100%;box-sizing:border-box;" placeholder="https://client-site.com" value="{{ wordpress_connection.site_url if wordpress_connection else '' }}"/>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#475569;font-weight:500;display:block;margin-bottom:5px;">API Token</label>
+        <input id="wp-api-token" type="password" class="dinput" style="width:100%;box-sizing:border-box;" placeholder="{% if wordpress_connection %}•••••••••••••• (saved — leave blank to keep){% else %}Bearer token from the plugin dashboard{% endif %}"/>
+      </div>
+      <div class="drow">
+        <label>Staging site</label>
+        <label class="tog"><input id="wp-is-staging" type="checkbox" {% if not wordpress_connection or wordpress_connection.is_staging %}checked{% endif %}><span class="tog-s"></span></label>
+      </div>
+      <div style="display:flex;gap:8px;margin:10px 0;">
+        <button type="button" onclick="saveWordPressConnection()" style="flex:1;padding:7px 10px;border-radius:7px;border:none;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Save</button>
+        <button type="button" onclick="testWordPressConnection()" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:12px;font-weight:700;cursor:pointer;">Test Connection</button>
+      </div>
+      <div id="wp-test-result" style="font-size:12px;font-weight:600;margin-bottom:8px;"></div>
+      {% if wordpress_connection %}
+      <button type="button" onclick="resolveWordPressPages()" id="wp-resolve-btn" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#4f46e5;font-size:12px;font-weight:700;cursor:pointer;">🔗 Resolve WordPress IDs</button>
+      <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Matches each crawled page to its WordPress post/page ID, so Deploy never has to ask for it manually.</div>
+      {% endif %}
+    </details>
+
+    <!-- 🔎 Google Search Console -->
+    <details class="dsec" id="gsc">
+      <summary>🔎 Google Search Console<svg class="dc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></summary>
+      {% if not gsc_configured %}
+        <div style="font-size:11px;color:#94a3b8;">Not configured on this server -- add the Google OAuth env vars to enable this.</div>
+      {% elif not gsc_connection %}
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Connect using the Google account that has Search Console access to this site -- your own account, or one your agency was added to as a user.</div>
+        <a href="/projects/{{ project.id }}/gsc/connect" style="display:block;text-align:center;padding:7px 10px;border-radius:7px;border:none;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">Connect Google Search Console</a>
+      {% else %}
+        <div style="font-size:12px;font-weight:700;color:{% if gsc_connection.status == 'active' %}#15803d{% else %}#dc2626{% endif %};margin-bottom:4px;">
+          {% if gsc_connection.status == 'active' %}Connected{% elif gsc_connection.status == 'revoked' %}Reconnect needed{% else %}Connection error{% endif %}
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px;">as {{ gsc_connection.google_account_email }}</div>
+        {% if gsc_properties %}
+          <div style="font-size:12px;color:#475569;font-weight:500;margin-bottom:5px;">Properties</div>
+          {% for p in gsc_properties %}
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+            <div>
+              <div style="font-size:12px;color:#334155;">{{ p.site_url }}</div>
+              <div style="font-size:10px;color:#94a3b8;">{{ p.permission_level or 'permission unknown' }}</div>
+            </div>
+            {% if p.selected %}
+              <span style="font-size:10px;font-weight:700;color:#4f46e5;">Selected</span>
+            {% else %}
+              <button type="button" onclick="selectGscProperty({{ p.id }})" style="padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:600;cursor:pointer;">Select</button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">No properties found for this account yet -- make sure it has Search Console access to the site, then reconnect.</div>
+        {% endif %}
+        <button type="button" onclick="disconnectGsc()" style="width:100%;margin-top:10px;padding:7px 10px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;">Disconnect</button>
+      {% endif %}
+    </details>
+
+  </div>
+  <div class="drawer-foot">
+    <button onclick="closeDrawer('settings-drawer')" style="padding:7px 16px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+    <button onclick="saveSettings()" style="padding:7px 18px;border-radius:7px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(79,70,229,.3);">Save Settings</button>
+  </div>
+</div>
+
+{# ── Business Profile Drawer ─────────────────────── #}
+<div id="profile-drawer" class="vtx-drawer">
+  <form method="post" action="/projects/{{ project.id }}/business-profile" style="display:flex;flex-direction:column;height:100%;">
+    <div class="drawer-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;">🏢</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0f172a;">Business Profile</div>
+          <div style="font-size:11px;color:#94a3b8;">Context the AI uses for localized suggestions</div>
+        </div>
+      </div>
+      <button type="button" onclick="closeDrawer('profile-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input type="hidden" name="return_to" value="/projects/{{ project.id }}#backlinks"/>
+    <div class="drawer-body">
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Brand</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="brand" value="{{ profile.brand or '' if profile else '' }}" placeholder="e.g. VTraffic.io"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Industry</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="industry" value="{{ profile.industry or '' if profile else '' }}" placeholder="e.g. Digital Marketing"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Services <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="services" placeholder="e.g. SEO, PPC, social media management">{{ profile.services|join(', ') if profile and profile.services else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Locations <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="locations" placeholder="e.g. Patna, Bihar, India">{{ profile.locations|join(', ') if profile and profile.locations else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Audiences <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="audiences" placeholder="e.g. small business owners, e-commerce startups">{{ profile.audiences|join(', ') if profile and profile.audiences else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Brand Tone</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="tone" value="{{ profile.tone or '' if profile else '' }}" placeholder="e.g. friendly, professional, Hindi-English mix"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">USP <span style="color:#94a3b8;font-weight:400;">(what makes it different)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="usp" placeholder="e.g. only same-day SEO audit turnaround in the region">{{ profile.usp or '' if profile else '' }}</textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button type="button" onclick="closeDrawer('profile-drawer')" style="padding:7px 16px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button type="submit" style="padding:7px 18px;border-radius:7px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(79,70,229,.3);">Save Profile</button>
+    </div>
+  </form>
+</div>
+
+{# ── All Rules Drawer (shared across every category's "View all rules" link) ── #}
+<div id="rules-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;">📋</div>
+      <div>
+        <div id="rules-drawer-title" style="font-size:14px;font-weight:700;color:#0f172a;">Rule Requirements</div>
+        <div style="font-size:11px;color:#94a3b8;">What the audit checks for this category</div>
+      </div>
+    </div>
+    <button onclick="closeDrawer('rules-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <div id="rules-drawer-body"></div>
+  </div>
+</div>
+
+{# ── Queue Drawer ─────────────────────────────────── #}
+<div id="queue-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;">📦</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">Crawler Queue</div>
+        <div style="font-size:11px;color:#94a3b8;">Live job status</div>
+      </div>
+    </div>
+    <button onclick="closeDrawer('queue-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;" onmouseover="this.style.background='#fee2e2';this.style.color='#dc2626'" onmouseout="this.style.background='#f8fafc';this.style.color='#64748b'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <!-- Tabs -->
+    <div style="display:flex;gap:2px;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:16px;">
+      {% for tab in ['Running','Queued','Completed','Failed'] %}
+      <button onclick="switchQTab(this,'{{ tab|lower }}')" data-qtab="{{ tab|lower }}"
+        style="flex:1;padding:5px 8px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,color .15s;{% if loop.first %}background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(0,0,0,.07);{% else %}background:transparent;color:#64748b;{% endif %}">
+        {{ tab }}
+      </button>
+      {% endfor %}
+    </div>
+    <!-- Tab content: populated by pollJobs() from GET /projects/{id}/jobs -->
+    {% for tab in ['running','queued','completed','failed'] %}
+    <div id="qtab-{{ tab }}" style="display:{% if loop.first %}block{% else %}none{% endif %};">
+      <div id="qtab-{{ tab }}-body">
+        <div style="text-align:center;padding:48px 0;">
+          <div style="font-size:36px;margin-bottom:12px;">{% if tab == 'running' %}🔄{% elif tab == 'queued' %}📦{% elif tab == 'completed' %}✅{% else %}❌{% endif %}</div>
+          <div style="font-size:13px;font-weight:600;color:#64748b;">No {{ tab }} jobs</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Jobs will appear here when crawling starts</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Revision History Drawer (Task 3.4) ───────────── #}
+<div id="history-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;">📜</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#0f172a;">Revision History</div>
+        <div style="font-size:11px;color:#94a3b8;">Every fix deployed to WordPress</div>
+      </div>
+    </div>
+    <button onclick="closeDrawer('history-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+    <div id="history-body"><div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:13px;">Loading…</div></div>
+  </div>
+</div>
+
+<!-- Backdrop -->
+<div id="drawer-backdrop" onclick="closeAllDrawers()"></div>
+
+<!-- Toasts -->
+<div id="toast-wrap"></div>
+
+<!-- Fix on Page modal -->
+<div id="page-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:900;" onclick="closePageModal()"></div>
+<div id="page-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(720px,92vw);max-height:86vh;overflow-y:auto;background:#fff;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.28);z-index:901;">
+  <div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px 14px 0 0;">
+    <div style="min-width:0;">
+      <div style="font-size:13px;font-weight:700;color:#0f172a;">Fix on Page</div>
+      <div id="page-modal-url" style="font-size:11px;color:#94a3b8;word-break:break-all;"></div>
+      <div id="page-modal-wp-status" style="font-size:10px;margin-top:2px;"></div>
+    </div>
+    <button onclick="closePageModal()" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#64748b;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="page-modal-body" style="padding:20px;">
+    <div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:13px;">Loading…</div>
+  </div>
+</div>
+
+<script>
+var RULE_REQUIREMENTS = {{ RULE_REQUIREMENTS | tojson }};
+
+// ── Drawer system ──────────────────────────────────
+function openDrawer(id) {
+  document.getElementById('drawer-backdrop').style.display = 'block';
+  document.getElementById(id).classList.add('open');
+}
+function closeDrawer(id) {
+  document.getElementById(id).classList.remove('open');
+  var anyOpen = document.querySelectorAll('.vtx-drawer.open').length > 0;
+  if (!anyOpen) document.getElementById('drawer-backdrop').style.display = 'none';
+}
+function closeAllDrawers() {
+  document.querySelectorAll('.vtx-drawer').forEach(function(d){ d.classList.remove('open'); });
+  document.getElementById('drawer-backdrop').style.display = 'none';
+}
+
+// ── Queue tabs ─────────────────────────────────────
+function switchQTab(btn, tab) {
+  document.querySelectorAll('[data-qtab]').forEach(function(b){
+    b.style.background = 'transparent'; b.style.color = '#64748b'; b.style.boxShadow = '';
+  });
+  btn.style.background = '#fff'; btn.style.color = '#4f46e5'; btn.style.boxShadow = '0 1px 3px rgba(0,0,0,.07)';
+  document.querySelectorAll('[id^="qtab-"]').forEach(function(el){ el.style.display = 'none'; });
+  document.getElementById('qtab-' + tab).style.display = 'block';
+}
+
+document.getElementById('crawl-form').addEventListener('submit', function() {
+  showToast('Crawling started…', 'info');
+});
+document.getElementById('audit-form').addEventListener('submit', function() {
+  showToast('🔍 Audit started…', 'info');
+});
+
+// ── Save settings ───────────────────────────────────
+function saveSettings() {
+  var body = {
+    enabled: document.getElementById('cs-enabled').checked,
+    interval: document.getElementById('cs-interval').value,
+    timezone: document.getElementById('cs-timezone').value,
+    cron_expression: document.getElementById('cs-cron').value || null,
+    user_agent: document.getElementById('cs-user-agent').value,
+    max_depth: parseInt(document.getElementById('cs-max-depth').value, 10),
+    crawl_delay_ms: parseInt(document.getElementById('cs-crawl-delay').value, 10),
+    timeout_s: parseInt(document.getElementById('cs-timeout').value, 10),
+    respect_robots: document.getElementById('cs-respect-robots').checked,
+    exclude_patterns: document.getElementById('cs-exclude-patterns').value,
+    worker_count: parseInt(document.getElementById('cs-worker-count').value, 10),
+    concurrency: parseInt(document.getElementById('cs-concurrency').value, 10),
+    retry_attempts: parseInt(document.getElementById('cs-retry-attempts').value, 10),
+    worker_timeout_s: parseInt(document.getElementById('cs-worker-timeout').value, 10),
+    firecrawl_validation: document.getElementById('cs-firecrawl-validation').checked,
+    coverage_target: parseInt(document.getElementById('cs-coverage-target').value, 10),
+  };
+  fetch('/projects/{{ project.id }}/crawl-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(function(res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    closeDrawer('settings-drawer');
+    showToast('✅ Settings saved', 'success');
+  }).catch(function(err) {
+    showToast('❌ Could not save settings: ' + err.message, 'error');
+  });
+}
+
+// ── Current-card content expand (markdown excerpt) ──
+function toggleCurrentMore(id) {
+  var excerpt = document.getElementById('cv-excerpt-' + id);
+  var full = document.getElementById('cv-full-' + id);
+  var link = document.getElementById('cv-toggle-' + id);
+  if (!full) return;
+  var showingFull = full.style.display !== 'none';
+  full.style.display = showingFull ? 'none' : 'block';
+  excerpt.style.display = showingFull ? 'block' : 'none';
+  link.textContent = showingFull ? 'Show more' : 'Show less';
+}
+
+// ── Optimization panel toggle ──────────────────────
+function toggleOptPanel(id) {
+  var row = document.getElementById(id);
+  var btn = document.getElementById('btn-' + id);
+  if (!row) return;
+  var isOpen = row.style.display !== 'none';
+  // Close all opt panels in the same table first
+  var table = row.closest('table');
+  if (table) {
+    table.querySelectorAll('[id^="opt-"]').forEach(function(r) {
+      if (r.tagName === 'TR' && r !== row) {
+        r.style.display = 'none';
+        var b = document.getElementById('btn-' + r.id);
+        if (b) { b.textContent = '▼ Optimize'; b.style.background = '#fff'; b.style.color = '#4f46e5'; }
+      }
+    });
+  }
+  if (isOpen) {
+    row.style.display = 'none';
+    if (btn) { btn.textContent = '▼ Optimize'; btn.style.background = '#fff'; btn.style.color = '#4f46e5'; }
+  } else {
+    row.style.display = 'table-row';
+    if (btn) { btn.textContent = '▲ Close'; btn.style.background = '#4f46e5'; btn.style.color = '#fff'; }
+    // Scroll into view gently
+    setTimeout(function() { row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 60);
+  }
+}
+
+// ── Suggestion status badge (shared style with the Fix on Page modal) ──
+var SUGG_STATUS_COLORS = {
+  accepted: 'background:#dcfce7;color:#15803d;', rejected: 'background:#fee2e2;color:#dc2626;',
+  edited: 'background:#dbeafe;color:#1d4ed8;', deployed: 'background:#f3e8ff;color:#7e22ce;',
+  pending: 'background:#f1f5f9;color:#64748b;',
+};
+function suggStatusBadge(status) {
+  return '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;' + (SUGG_STATUS_COLORS[status] || SUGG_STATUS_COLORS.pending) + '">' + status + '</span>';
+}
+
+// ── Generate AI suggestions (live Claude API) ──────
+async function generateSugg(rid, projectId, pageId, issueId) {
+  var box = document.getElementById('sugg-' + rid);
+  var ta  = document.getElementById('ta-' + rid);
+  if (!box) return;
+
+  box.innerHTML = '<div style="text-align:center;padding:16px 0;">'
+    + '<div style="font-size:22px;animation:spin 1s linear infinite;display:inline-block;">⚙️</div>'
+    + '<div style="font-size:10px;color:#94a3b8;margin-top:8px;line-height:1.5;">Generating with Claude…<br><span style="font-size:9px;color:#c7d2fe;">This may take a few seconds</span></div>'
+    + '</div>';
+
+  try {
+    var resp = await fetch(
+      '/api/suggest?project_id=' + projectId + '&page_id=' + pageId + '&issue_id=' + issueId,
+      { method: 'POST' }
+    );
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    var suggestions = data.suggestions || [];
+    if (!suggestions.length) throw new Error('empty');
+
+    var colors = ['#4f46e5','#7c3aed','#0891b2','#0d9488','#65a30d'];
+    var html = '';
+    suggestions.forEach(function(s, i) {
+      var isFirst = i === 0;
+      var accent = colors[i] || '#4f46e5';
+      var text = s.edited_content || s.content;
+      var safeText = text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '<div data-sugg-id="' + s.id + '" data-sugg-content="' + text.replace(/"/g,'&quot;') + '" data-rid="' + rid + '"'
+        + ' onclick="selectSugg(this)"'
+        + ' style="padding:7px 9px;border:1px solid ' + (isFirst ? '#a5b4fc' : '#e2e8f0') + ';'
+        + 'border-left:3px solid ' + (isFirst ? accent : '#e2e8f0') + ';'
+        + 'border-radius:7px;background:' + (isFirst ? '#eef2ff' : '#fff') + ';'
+        + 'cursor:pointer;font-size:11px;color:#0f172a;margin-bottom:5px;line-height:1.4;'
+        + 'transition:border-color .12s,background .12s;"'
+        + ' onmouseover="if(!this.classList.contains(\'sugg-sel\')){this.style.borderLeftColor=\'' + accent + '\';this.style.background=\'#f5f3ff\'}"'
+        + ' onmouseout="if(!this.classList.contains(\'sugg-sel\')){this.style.borderLeftColor=\'#e2e8f0\';this.style.background=\'#fff\'}">'
+        + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">'
+        + '<span style="font-size:9px;font-weight:700;color:#94a3b8;">' + (i + 1) + '</span>'
+        + (isFirst ? '<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:#dcfce7;color:#15803d;">Best</span>' : '')
+        + '<span data-sugg-badge>' + suggStatusBadge(s.status) + '</span>'
+        + '</div>'
+        + '<div>' + safeText + '</div>'
+        + '<div style="font-size:9px;color:#94a3b8;margin-top:3px;">Click to use in editor</div>'
+        + '</div>';
+    });
+    box.innerHTML = html;
+
+    // Auto-select first
+    var firstCard = box.querySelector('[data-sugg-id]');
+    if (firstCard) selectSugg(firstCard);
+
+  } catch(e) {
+    box.innerHTML = '<div style="text-align:center;padding:12px 0;">'
+      + '<div style="font-size:10px;color:#dc2626;margin-bottom:6px;">Failed to generate suggestions.</div>'
+      + '<button onclick="generateSugg(\'' + rid + '\',' + projectId + ',' + pageId + ',' + issueId + ')"'
+      + ' style="font-size:10px;font-weight:700;padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#4f46e5;cursor:pointer;">↺ Retry</button>'
+      + '</div>';
+  }
+}
+
+function selectSugg(el) {
+  var rid = el.getAttribute('data-rid');
+  var ta  = document.getElementById('ta-' + rid);
+  var box = document.getElementById('sugg-' + rid);
+  // Reset all cards
+  if (box) box.querySelectorAll('[data-sugg-id]').forEach(function(c) {
+    c.classList.remove('sugg-sel');
+    c.style.borderLeftColor = '#e2e8f0';
+    c.style.background = '#fff';
+    c.style.border = '1px solid #e2e8f0';
+    c.style.borderLeft = '3px solid #e2e8f0';
+  });
+  // Highlight selected
+  el.classList.add('sugg-sel');
+  el.style.borderLeft = '3px solid #4f46e5';
+  el.style.background = '#eef2ff';
+  // Populate textarea + remember which suggestion row is selected
+  if (ta) {
+    var content = el.getAttribute('data-sugg-content');
+    ta.value = content;
+    ta.dataset.suggId = el.getAttribute('data-sugg-id');
+    ta.dataset.suggOriginal = content;
+  }
+  var status = document.getElementById('ta-status-' + rid);
+  if (status) status.innerHTML = '';
+  validateRule(rid);
+}
+
+// ── Save: accept the selected suggestion as-is, or store the edit if the
+// textarea no longer matches what was generated. Routes through the same
+// /suggestions/{id}/accept and /suggestions/{id}/edit endpoints the Fix on
+// Page modal uses -- one pipeline, two entry points. ──
+async function saveSuggEdit(rid) {
+  var ta = document.getElementById('ta-' + rid);
+  var statusEl = document.getElementById('ta-status-' + rid);
+  var saveBtn = document.getElementById('save-' + rid);
+  if (!ta || !ta.dataset.suggId) {
+    showToast('Generate and select a suggestion first.', 'error');
+    return;
+  }
+  var value = ta.value.trim();
+  if (!value) { showToast('Suggestion text cannot be empty.', 'error'); return; }
+
+  var id = ta.dataset.suggId;
+  var changed = value !== ta.dataset.suggOriginal;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    var resp = changed
+      ? await fetch('/suggestions/' + id + '/edit', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: value }),
+        })
+      : await fetch('/suggestions/' + id + '/accept', { method: 'POST' });
+    if (!resp.ok) { var d = await resp.json().catch(function(){return {};}); throw new Error(d.detail || ('HTTP ' + resp.status)); }
+    var s = await resp.json();
+    if (statusEl) statusEl.innerHTML = suggStatusBadge(s.status);
+    var card = document.querySelector('[data-sugg-id="' + id + '"][data-rid="' + rid + '"] [data-sugg-badge]');
+    if (card) card.innerHTML = suggStatusBadge(s.status);
+    if (changed) { ta.dataset.suggOriginal = value; }
+    showToast(changed ? 'Suggestion edited and saved.' : 'Suggestion accepted.');
+  } catch (err) {
+    showToast('Could not save: ' + err.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+
+// ── Rule validation (does the candidate value pass its own audit rule?) ──
+async function validateRule(rid) {
+  var ta = document.getElementById('ta-' + rid);
+  var container = document.getElementById('rule-' + rid);
+  if (!ta || !container) return;
+
+  var category = ta.dataset.category;
+  var value = ta.value.trim();
+  if (!value) return; // nothing typed/selected yet — leave the original-issue state showing
+
+  container.innerHTML = '<span style="font-size:10px;color:#94a3b8;">Validating…</span>';
+  try {
+    var resp = await fetch('/api/validate-rule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'category=' + encodeURIComponent(category) + '&value=' + encodeURIComponent(value)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+
+    if (!data.applicable) {
+      container.innerHTML = '<span style="font-size:10px;color:#94a3b8;">No automated rule for this field — review manually</span>';
+      return;
+    }
+
+    var badge = data.passed
+      ? '<span style="display:inline-block;background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Passed</span>'
+      : '<span style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">Failed</span>';
+
+    var rows;
+    if (data.passed) {
+      rows = '<div style="display:flex;align-items:center;gap:5px;margin-top:10px;">'
+        + '<div style="width:14px;height:14px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="8" height="8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>'
+        + '<span style="font-size:10px;color:#374151;">Meets this rule’s requirements</span></div>';
+    } else {
+      rows = data.issues.map(function(i) {
+        return '<div style="display:flex;align-items:center;gap:5px;margin-top:6px;">'
+          + '<div style="width:14px;height:14px;border-radius:50%;background:#dc2626;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="8" height="8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></div>'
+          + '<span style="font-size:10px;color:#374151;">' + i.message + '</span></div>';
+      }).join('');
+    }
+
+    container.innerHTML = badge + '<div style="display:flex;flex-direction:column;gap:6px;">' + rows + '</div>';
+  } catch (e) {
+    container.innerHTML = '<span style="font-size:10px;color:#dc2626;">Could not validate</span>';
+  }
+}
+
+// ── All Rules drawer (same reference data every "View all rules" link uses) ──
+function openRulesDrawer(category, label) {
+  var rules = RULE_REQUIREMENTS[category] || [];
+  document.getElementById('rules-drawer-title').textContent = (label || category) + ' — Rule Requirements';
+
+  var html;
+  if (!rules.length) {
+    html = '<div style="font-size:12px;color:#94a3b8;">No automated rules for this category.</div>';
+  } else {
+    html = rules.map(function(r) {
+      var badgeColor = r.severity === 'error' ? '#dc2626' : '#a16207';
+      var badgeBg = r.severity === 'error' ? '#fee2e2' : '#fef9c3';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid #f1f5f9;">'
+        + '<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + badgeBg + ';color:' + badgeColor + ';">' + r.severity + '</span>'
+        + '<div style="font-size:12px;color:#374151;line-height:1.5;">' + r.description + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  document.getElementById('rules-drawer-body').innerHTML = html;
+  openDrawer('rules-drawer');
+}
+
+// ── Revision History (Task 3.4) ─────────────────────
+function loadRevisionHistory() {
+  var body = document.getElementById('history-body');
+  fetch('/projects/{{ project.id }}/revisions').then(function(r){ return r.json(); }).then(function(rows) {
+    if (!rows.length) {
+      body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:13px;">No deploys yet.</div>';
+      return;
+    }
+    body.innerHTML = rows.map(function(r) {
+      var when = (r.deployed_at || '').replace('T', ' ').slice(0, 19);
+      var statusChip = r.rolled_back_at
+        ? '<span style="font-size:10px;font-weight:700;background:#fef3c7;color:#a16207;padding:2px 8px;border-radius:8px;">Rolled back</span>'
+        : '<span style="font-size:10px;font-weight:700;background:#f3e8ff;color:#7e22ce;padding:2px 8px;border-radius:8px;">Deployed</span>';
+      var rollbackBtn = r.rolled_back_at ? '' :
+        '<button onclick="rollbackRevisionFromHistory(' + r.id + ')" style="font-size:11px;color:#ea580c;font-weight:600;background:none;border:none;cursor:pointer;">↩ Roll back</button>';
+      return '<div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;background:#fff;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+          '<div style="font-size:12px;font-weight:700;color:#0f172a;">' + r.field_name + ' <span style="color:#94a3b8;font-weight:600;">· post #' + r.wp_post_id + '</span></div>' +
+          statusChip +
+        '</div>' +
+        '<div style="font-size:11px;color:#64748b;margin-top:6px;"><s style="color:#dc2626;">' + (r.before_value || '(empty)') + '</s> → <span style="color:#16a34a;">' + (r.after_value || '') + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">' +
+          '<span style="font-size:10px;color:#94a3b8;">' + when + '</span>' + rollbackBtn +
+        '</div></div>';
+    }).join('');
+  }).catch(function(){ body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#dc2626;font-size:13px;">Could not load revision history.</div>'; });
+}
+function rollbackRevisionFromHistory(id) {
+  fetch('/revisions/' + id + '/rollback', { method: 'POST' })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      loadRevisionHistory();
+    })
+    .catch(function(err) { alert('Rollback failed: ' + err.message); });
+}
+
+// ── WordPress connection (Task 3.2) ─────────────────
+function saveWordPressConnection() {
+  var siteUrl = document.getElementById('wp-site-url').value.trim();
+  var token = document.getElementById('wp-api-token').value.trim();
+  var isStaging = document.getElementById('wp-is-staging').checked;
+  var result = document.getElementById('wp-test-result');
+  if (!siteUrl) { result.style.color = '#dc2626'; result.textContent = 'Site URL is required.'; return; }
+  if (!token) { result.style.color = '#dc2626'; result.textContent = 'API Token is required to save (paste it again even if reconnecting).'; return; }
+  fetch('/projects/{{ project.id }}/wordpress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ site_url: siteUrl, api_token: token, is_staging: isStaging }),
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+    result.style.color = '#16a34a';
+    result.textContent = '✅ Connection saved. Click Test Connection to verify.';
+    document.getElementById('wp-api-token').value = '';
+  }).catch(function(err) {
+    result.style.color = '#dc2626';
+    result.textContent = '❌ ' + err.message;
+  });
+}
+function testWordPressConnection() {
+  var result = document.getElementById('wp-test-result');
+  result.style.color = '#64748b';
+  result.textContent = 'Testing…';
+  fetch('/projects/{{ project.id }}/wordpress/test', { method: 'POST' })
+    .then(function(res) { return res.json().then(function(d){ return { ok: res.ok, body: d }; }); })
+    .then(function(r) {
+      if (r.ok) {
+        result.style.color = '#16a34a';
+        result.textContent = '✅ Connected — ' + (r.body.site && r.body.site.plugin ? r.body.site.plugin + ' v' + r.body.site.version : 'plugin responded');
+        var rp = r.body.resolved_pages;
+        if (rp) showToast('WordPress IDs resolved: ' + rp.resolved + ' linked' + (rp.failed ? ', ' + rp.failed + ' not matched' : '') + '.');
+      } else {
+        result.style.color = '#dc2626';
+        result.textContent = '❌ ' + (r.body.detail || 'Connection test failed');
+      }
+    })
+    .catch(function(err) { result.style.color = '#dc2626'; result.textContent = '❌ ' + err.message; });
+}
+function resolveWordPressPages() {
+  var btn = document.getElementById('wp-resolve-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resolving…'; }
+  fetch('/projects/{{ project.id }}/wordpress/resolve-pages', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function(summary) {
+      var msg = 'WordPress IDs resolved: ' + summary.resolved + ' linked';
+      if (summary.failed) msg += ', ' + summary.failed + ' not matched';
+      showToast(msg + '.');
+    })
+    .catch(function(err) { showToast('Resolve failed: ' + err.message, 'error'); })
+    .finally(function() { if (btn) { btn.disabled = false; btn.textContent = '🔗 Resolve WordPress IDs'; } });
+}
+
+// ── Google Search Console (Task 5) ──────────────────
+function selectGscProperty(propertyId) {
+  fetch('/projects/{{ project.id }}/gsc/properties/' + propertyId + '/select', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function() { location.reload(); })
+    .catch(function(err) { showToast('Could not select property: ' + err.message, 'error'); });
+}
+function disconnectGsc() {
+  if (!confirm('Disconnect Google Search Console for this project? You can reconnect any time.')) return;
+  fetch('/projects/{{ project.id }}/gsc/disconnect', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function() { location.reload(); })
+    .catch(function(err) { showToast('Could not disconnect: ' + err.message, 'error'); });
+}
+
+// ── Backlinks (Task 5.1) ────────────────────────────
+function blStat(label, value, color) {
+  return `<div><div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">${label}</div>` +
+    `<div style="font-size:20px;font-weight:800;color:${color || '#0f172a'};">${value ?? '—'}</div></div>`;
+}
+// Deterministic threshold, not AI -- spam score is a fact from the provider,
+// this just colors it. Matches the brief's "never use an LLM for basic
+// detection" rule: this is a plain if/else on a number.
+function spamColor(score) {
+  if (score == null) return '#0f172a';
+  if (score >= 30) return '#dc2626';
+  if (score >= 15) return '#d97706';
+  return '#16a34a';
+}
+function blBar(label, value, max, color) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return `<div style="margin-bottom:7px;">
+    <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+      <span style="color:#374151;font-weight:600;">${label}</span>
+      <span style="color:#94a3b8;">${value.toLocaleString()}</span>
+    </div>
+    <div style="background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>
+    </div>
+  </div>`;
+}
+function renderDistribution(elId, dist, color) {
+  const el = document.getElementById(elId);
+  if (!dist) { el.innerHTML = '<div style="font-size:11px;color:#cbd5e1;">Not available from this provider.</div>'; return; }
+  const entries = Object.entries(dist).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = entries.length ? entries[0][1] : 0;
+  el.innerHTML = entries.map(([k, v]) => blBar(k || '(unknown)', v, max, color)).join('');
+}
+function renderBacklinks(d) {
+  const body = document.getElementById('bl-body');
+  const badge = document.getElementById('bl-source-badge');
+  const extras = document.getElementById('bl-extras');
+  if (d.status === 'no_snapshot_yet') {
+    body.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#94a3b8;">No backlink data yet — click Refresh to pull it from the active Data Provider (see Settings).</div>';
+    badge.style.display = 'none';
+    extras.style.display = 'none';
+    return;
+  }
+
+  if (d.source) {
+    const isDfs = d.source === 'dataforseo';
+    badge.style.display = 'inline-block';
+    badge.style.background = isDfs ? '#eef2ff' : '#fff7ed';
+    badge.style.color = isDfs ? '#4338ca' : '#c2410c';
+    badge.textContent = isDfs ? 'via DataForSEO' : 'via SEMrush';
+  }
+
+  const stats = [
+    blStat('Authority / Rank', d.authority_score, '#7c3aed'),
+    blStat('Referring Domains', d.referring_domains?.toLocaleString(), '#0284c7'),
+    blStat('Total Backlinks', d.total_backlinks?.toLocaleString(), '#16a34a'),
+    blStat('Follow / Nofollow', (d.follow_links ?? '—') + ' / ' + (d.nofollow_links ?? '—'), '#d97706'),
+  ];
+  if (d.spam_score != null) stats.push(blStat('Spam Score', d.spam_score, spamColor(d.spam_score)));
+  if (d.broken_backlinks != null) stats.push(blStat('Broken Backlinks', d.broken_backlinks, d.broken_backlinks > 0 ? '#dc2626' : '#16a34a'));
+  body.innerHTML = stats.join('');
+  body.style.gridTemplateColumns = `repeat(${stats.length}, 1fr)`;
+
+  if (d.tld_distribution || d.platform_distribution) {
+    extras.style.display = 'grid';
+    renderDistribution('bl-tld-bars', d.tld_distribution, '#4f46e5');
+    renderDistribution('bl-platform-bars', d.platform_distribution, '#0891b2');
+  } else {
+    extras.style.display = 'none';
+  }
+}
+function loadBacklinks() {
+  fetch('/projects/{{ project.id }}/backlinks').then(r => r.json()).then(renderBacklinks)
+    .catch(() => { document.getElementById('bl-body').innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#dc2626;">Could not load backlink data.</div>'; });
+}
+function refreshBacklinks() {
+  const btn = document.getElementById('bl-refresh-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  fetch('/projects/{{ project.id }}/backlinks/refresh', { method: 'POST' })
+    .then(res => res.json().then(d => ({ ok: res.ok, d })))
+    .then(({ ok, d }) => {
+      btn.disabled = false; btn.textContent = 'Refresh now';
+      if (!ok) { showToast('❌ ' + (d.detail || 'Refresh failed'), 'error'); return; }
+      renderBacklinks(d);
+      showToast('✅ Backlinks refreshed', 'success');
+    })
+    .catch(err => { btn.disabled = false; btn.textContent = 'Refresh now'; showToast('❌ ' + err.message, 'error'); });
+}
+loadBacklinks();
+
+let blCurrentTab = 'active';
+function switchBlTab(btn, tab) {
+  document.querySelectorAll('[data-bltab]').forEach(function(b){
+    b.style.background = 'transparent'; b.style.color = '#64748b'; b.style.boxShadow = '';
+  });
+  btn.style.background = '#fff'; btn.style.color = '#4f46e5'; btn.style.boxShadow = '0 1px 3px rgba(0,0,0,.07)';
+  blCurrentTab = tab;
+  loadBacklinkRecords();
+}
+function loadBacklinkRecords() {
+  const body = document.getElementById('bl-records-body');
+  body.innerHTML = 'Loading…';
+  fetch(`/projects/{{ project.id }}/backlinks/records?filter=${blCurrentTab}`).then(r => r.json()).then(rows => {
+    const countEl = document.getElementById('bl-records-count');
+    if (countEl) countEl.textContent = rows.length ? `${rows.length} ${blCurrentTab}` : '';
+    if (!rows.length) { body.innerHTML = `No ${blCurrentTab} backlinks${blCurrentTab === 'active' ? ' yet -- click Refresh now or enable weekly auto-pull.' : '.'}`; return; }
+    const hasExtras = rows.some(r => r.domain_rank != null || r.spam_score != null);
+    body.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
+      '<thead><tr style="text-align:left;color:#94a3b8;"><th style="padding:4px 8px;">Source</th><th style="padding:4px 8px;">Anchor</th>' +
+      (hasExtras ? '<th style="padding:4px 8px;">Domain Rank</th><th style="padding:4px 8px;">Spam</th>' : '') +
+      '<th style="padding:4px 8px;">Follow</th></tr></thead><tbody>' +
+      rows.map(r => `<tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:4px 8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="${r.source_url}" target="_blank" rel="noopener" style="color:#4f46e5;text-decoration:none;">${r.source_url}</a></td>
+        <td style="padding:4px 8px;color:#64748b;">${r.anchor_text || '—'}</td>` +
+        (hasExtras ? `<td style="padding:4px 8px;color:#374151;">${r.domain_rank ?? '—'}</td>
+        <td style="padding:4px 8px;color:${r.spam_score >= 30 ? '#dc2626' : r.spam_score >= 15 ? '#d97706' : '#374151'};">${r.spam_score ?? '—'}</td>` : '') +
+        `<td style="padding:4px 8px;">${r.is_follow ? '✅' : '🚫'}</td>
+      </tr>`).join('') + '</tbody></table>';
+  }).catch(() => { body.innerHTML = 'Could not load backlink records.'; });
+}
+loadBacklinkRecords();
+
+function saveBacklinkSchedule() {
+  const enabled = document.getElementById('bl-sched-enabled').checked;
+  fetch('/projects/{{ project.id }}/schedule/backlink_pull', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: enabled, interval: 'weekly', timezone: 'Asia/Kolkata' }),
+  }).then(res => {
+    if (!res.ok) return res.json().then(d => { throw new Error(d.detail || ('HTTP ' + res.status)); });
+    showToast('✅ Backlink schedule saved', 'success');
+  }).catch(err => showToast('❌ ' + err.message, 'error'));
+}
+
+// ── Job queue polling (Queue drawer + 📦 badge) ─────
+function jobRow(j) {
+  var icon = { crawl: '🕷️', rank_check: '📈', keyword_refresh: '🔄', backlink_pull: '🔗', audit: '🔍' }[j.job_type] || '⚙️';
+  var when = j.finished_at || j.started_at || j.created_at || '';
+  when = when ? when.replace('T', ' ').slice(0, 19) : '';
+  var detail = '';
+  if (j.status === 'completed' && j.result_summary) {
+    detail = Object.entries(j.result_summary).map(function(kv){ return kv[0].replace(/_/g,' ') + ': ' + kv[1]; }).join(' · ');
+  } else if (j.error) {
+    detail = j.error;
+  }
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;background:#fff;">' +
+    '<span style="font-size:16px;">' + icon + '</span>' +
+    '<div style="min-width:0;flex:1;">' +
+      '<div style="font-size:12px;font-weight:700;color:#0f172a;">' + j.job_type + ' <span style="color:#94a3b8;font-weight:600;">#' + j.id + '</span></div>' +
+      (detail ? '<div style="font-size:11px;color:#64748b;margin-top:2px;word-break:break-word;">' + detail + '</div>' : '') +
+      '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + when + '</div>' +
+    '</div></div>';
+}
+function renderQTab(tab, rows) {
+  var body = document.getElementById('qtab-' + tab + '-body');
+  if (!body) return;
+  if (!rows.length) {
+    var icon = { running: '🔄', queued: '📦', completed: '✅', failed: '❌' }[tab];
+    body.innerHTML = '<div style="text-align:center;padding:48px 0;">' +
+      '<div style="font-size:36px;margin-bottom:12px;">' + icon + '</div>' +
+      '<div style="font-size:13px;font-weight:600;color:#64748b;">No ' + tab + ' jobs</div></div>';
+    return;
+  }
+  body.innerHTML = rows.map(jobRow).join('');
+}
+function pollJobs() {
+  fetch('/projects/{{ project.id }}/jobs').then(function(r){ return r.json(); }).then(function(data) {
+    ['running', 'queued', 'completed', 'failed'].forEach(function(tab){ renderQTab(tab, data[tab] || []); });
+    var badge = document.getElementById('queue-badge');
+    if (badge) {
+      badge.style.display = data.badge > 0 ? 'block' : 'none';
+      badge.textContent = data.badge;
+    }
+  }).catch(function(){ /* polling failure shouldn't break the page */ });
+}
+pollJobs();
+setInterval(pollJobs, 10000);
+
+// ── Toast ──────────────────────────────────────────
+function showToast(msg, type) {
+  var wrap = document.getElementById('toast-wrap');
+  var t = document.createElement('div');
+  t.className = 'vtx-toast ' + (type || 'success');
+  t.innerHTML = '<span>' + msg + '</span>';
+  wrap.appendChild(t);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ t.classList.add('show'); }); });
+  setTimeout(function(){
+    t.classList.remove('show');
+    setTimeout(function(){ t.remove(); }, 320);
+  }, 3200);
+}
+
+// ── Fix on Page modal ─────────────────────────────
+function pmEsc(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+var currentPageModalId = null;
+var currentPageModalIssueId = null;
+function openPageModal(pageId, issueId) {
+  currentPageModalId = pageId;
+  currentPageModalIssueId = issueId || null;
+  document.getElementById('page-modal-backdrop').style.display = 'block';
+  document.getElementById('page-modal').style.display = 'block';
+  document.getElementById('page-modal-body').innerHTML = '<div style="text-align:center;padding:32px 0;color:#94a3b8;font-size:13px;">Loading…</div>';
+  document.getElementById('page-modal-url').textContent = '';
+  loadPageModal(pageId, currentPageModalIssueId);
+}
+function closePageModal() {
+  document.getElementById('page-modal-backdrop').style.display = 'none';
+  document.getElementById('page-modal').style.display = 'none';
+  currentPageModalId = null;
+  currentPageModalIssueId = null;
+}
+function loadPageModal(pageId, issueId) {
+  var url = '/projects/{{ project.id }}/pages/' + pageId + '/detail-json';
+  if (issueId) url += '?issue_id=' + issueId;
+  fetch(url)
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(renderPageModal)
+    .catch(function(err) {
+      document.getElementById('page-modal-body').innerHTML = '<div style="color:#dc2626;font-size:13px;">Could not load page: ' + pmEsc(err.message) + '</div>';
+    });
+}
+// 'deployed' only means WordPress accepted the write; this badge shows whether
+// the live page actually reflects it. Missing live_status is treated as 'checking'.
+function pmLiveBadge(s) {
+  var st = s.live_status || 'checking';
+  var map = {
+    checking: ['background:#f1f5f9;color:#64748b;', '⏳ Checking live page…'],
+    live: ['background:#dcfce7;color:#15803d;', '✓ Live on site'],
+    not_showing: ['background:#fef3c7;color:#b45309;', '⚠ Saved, not showing on site yet'],
+    unverified: ['background:#fee2e2;color:#dc2626;', "⚠ Couldn't verify"]
+  };
+  var m = map[st] || map.checking;
+  if (st === 'not_showing' && s.live_rechecking) {
+    m = ['background:#fef3c7;color:#b45309;', '⏳ Not showing yet — re-checking automatically'];
+  }
+  var html = '<span title="' + pmEsc(s.live_detail) + '" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;' + m[0] + '">' + m[1] + '</span>';
+  var revId = parseInt(s.live_revision_id, 10);
+  if (st !== 'live' && !isNaN(revId)) {
+    html += '<button onclick="pmReverify(' + revId + ')" style="font-size:10px;color:#4f46e5;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">Re-check</button>';
+  }
+  return html;
+}
+// Polls until this revision's live check finishes, then reloads the modal so
+// the badge shows the real result instead of sitting on "Checking…".
+var PM_DONE_STATES = ['verified', 'mismatch', 'error'];
+function pmWatchRevision(revisionId, attempt) {
+  attempt = attempt || 0;
+  if (attempt >= 24) return;  // ~2 minutes at 5s; Re-check still works after that
+  setTimeout(function() {
+    fetch('/projects/{{ project.id }}/revisions')
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(list) {
+        var rev = (list || []).find(function(x) { return x.id === revisionId; });
+        if (!rev || PM_DONE_STATES.indexOf(rev.verify_status) === -1) return pmWatchRevision(revisionId, attempt + 1);
+        if (currentPageModalId) loadPageModal(currentPageModalId, currentPageModalIssueId);
+        showToast(rev.verify_status === 'verified' ? 'Verified: the change is live on the site.' : 'Saved, but the live page does not show it yet.', rev.verify_status === 'verified' ? undefined : 'error');
+      })
+      .catch(function() { pmWatchRevision(revisionId, attempt + 1); });
+  }, 5000);
+}
+function pmReverify(revisionId) {
+  fetch('/revisions/' + revisionId + '/verify', { method: 'POST' })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      showToast('Re-checking the live page…');
+      if (currentPageModalId) loadPageModal(currentPageModalId, currentPageModalIssueId);
+      pmWatchRevision(revisionId);
+    })
+    .catch(function(err) { showToast('Re-check failed: ' + err.message, 'error'); });
+}
+function pmSuggestionHtml(issue, s) {
+  var statusColors = {
+    accepted: 'background:#dcfce7;color:#15803d;', rejected: 'background:#fee2e2;color:#dc2626;',
+    edited: 'background:#dbeafe;color:#1d4ed8;', deployed: 'background:#f3e8ff;color:#7e22ce;',
+    pending: 'background:#f1f5f9;color:#64748b;',
+  };
+  var canDeploy = ['accepted', 'edited'].indexOf(s.status) !== -1 && ['meta_description', 'title', 'h1', 'twitter', 'canonical', 'opengraph'].indexOf(issue.category) !== -1;
+  var actions = s.status === 'deployed'
+    ? pmLiveBadge(s) + '<button onclick="pmSuggRollback(' + s.id + ')" style="font-size:11px;color:#ea580c;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">↩ Roll back</button>'
+    : '<button onclick="pmSuggDecide(' + s.id + ',\'accept\')" style="font-size:11px;color:#15803d;background:none;border:none;cursor:pointer;padding:0;">Accept</button>' +
+      '<button onclick="pmSuggDecide(' + s.id + ',\'reject\')" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0;">Reject</button>' +
+      '<button onclick="pmSuggEditPrompt(' + s.id + ',' + JSON.stringify(s.edited_content || s.content).replace(/"/g, '&quot;') + ')" style="font-size:11px;color:#4f46e5;background:none;border:none;cursor:pointer;padding:0;">Edit</button>' +
+      (canDeploy ? '<button onclick="pmSuggDeploy(' + s.id + ', this)" style="font-size:11px;color:#7e22ce;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">🚀 Deploy</button>' : '');
+  return '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;padding:6px 0;border-top:1px solid #f1f5f9;">' +
+    '<span style="flex-shrink:0;width:18px;height:18px;border-radius:50%;background:#eef2ff;color:#4f46e5;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + s.rank + '</span>' +
+    '<div style="flex:1;min-width:0;">' +
+    '<div style="color:#1e293b;">' + pmEsc(s.edited_content || s.content) + '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">' +
+    '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;' + (statusColors[s.status] || statusColors.pending) + '">' + s.status + '</span>' +
+    actions + '</div></div></div>';
+}
+function pmIssueHtml(issue, opts) {
+  opts = opts || {};
+  var sevColor = issue.severity === 'error' ? 'background:#fee2e2;color:#dc2626;' : 'background:#fef3c7;color:#b45309;';
+  var suggHtml = (issue.suggestions || []).map(function(s) { return pmSuggestionHtml(issue, s); }).join('');
+  var focusedStyle = opts.focused
+    ? 'background:#eef2ff;border:1.5px solid #a5b4fc;border-radius:10px;padding:14px 16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(79,70,229,.08);'
+    : 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;';
+  return '<div style="' + focusedStyle + '">' +
+    (opts.focused ? '<div style="font-size:10px;font-weight:700;color:#4f46e5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">📍 Selected issue</div>' : '') +
+    '<div style="display:flex;align-items:center;justify-content:between;gap:8px;flex-wrap:wrap;">' +
+    '<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;' + sevColor + '">' + pmEsc(issue.severity) + '</span>' +
+    '<span style="font-size:10px;color:#94a3b8;text-transform:capitalize;">' + pmEsc(issue.category.replace(/_/g, ' ')) + ' · ' + pmEsc(issue.rule.replace(/_/g, ' ')) + '</span>' +
+    '<button onclick="pmGetSuggestions(' + issue.id + ')" style="margin-left:auto;font-size:10px;font-weight:600;background:#4f46e5;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">Get Suggestions</button>' +
+    '</div>' +
+    '<div style="font-size:12px;color:#334155;margin-top:6px;">' + pmEsc(issue.message) + '</div>' +
+    (suggHtml ? '<div style="margin-top:6px;">' + suggHtml + '</div>' : '') +
+    '</div>';
+}
+function renderPageModal(d) {
+  document.getElementById('page-modal-url').textContent = d.url;
+  var wpStatus = document.getElementById('page-modal-wp-status');
+  if (wpStatus) {
+    wpStatus.innerHTML = d.wp_post_id
+      ? '<span style="color:#15803d;font-weight:600;">🔗 Linked to WordPress post #' + d.wp_post_id + '</span>'
+      : '<span style="color:#94a3b8;">Not linked to a WordPress post yet</span> '
+        + '<a href="#" onclick="pmResolveWpPost();return false;" style="font-size:10px;color:#4f46e5;font-weight:600;text-decoration:none;">Resolve now</a>';
+  }
+  if (d.error) {
+    document.getElementById('page-modal-body').innerHTML = '<div style="background:#fee2e2;color:#dc2626;padding:10px 12px;border-radius:8px;font-size:13px;">' + pmEsc(d.error) + '</div>';
+    return;
+  }
+  var checklist = (d.title_checklist || []).map(function(pair) {
+    var label = pair[0], passed = pair[1];
+    return '<li style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;">' +
+      '<span style="' + (passed ? 'color:#16a34a;' : 'color:#dc2626;') + 'font-weight:700;">' + (passed ? '✓' : '✕') + '</span>' + pmEsc(label) + '</li>';
+  }).join('');
+
+  var focusedHtml = d.focused_issue ? pmIssueHtml(d.focused_issue, { focused: true }) : '';
+  var otherIssues = d.other_issues || [];
+  var otherLabel = d.focused_issue ? 'Other issues on this page (' + otherIssues.length + ')' : 'All Other Issues (' + otherIssues.length + ')';
+  var otherHtml = otherIssues.map(function(i) { return pmIssueHtml(i, { focused: false }); }).join('') ||
+    '<div style="font-size:12px;color:#94a3b8;">No other issues detected.</div>';
+  var otherSection = d.focused_issue
+    ? '<details' + (otherIssues.length ? '' : ' open') + '><summary style="cursor:pointer;font-size:11px;font-weight:700;color:#64748b;padding:8px 0;border-top:1px dashed #e2e8f0;margin-top:4px;list-style:none;">▸ ' + otherLabel + '</summary><div style="margin-top:8px;">' + otherHtml + '</div></details>'
+    : '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:8px;">' + otherLabel + '</div>' + otherHtml;
+
+  document.getElementById('page-modal-body').innerHTML =
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">' +
+    '<div style="width:56px;height:56px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#4f46e5;flex-shrink:0;">' + (d.score == null ? '—' : d.score) + '</div>' +
+    '<div><div style="font-size:12px;font-weight:600;color:#334155;">Current Score</div>' +
+    '<div style="font-size:11px;color:#94a3b8;">' + (d.crawled_ago ? 'Crawled ' + pmEsc(d.crawled_ago) + ' · ' : '') + d.word_count + ' words</div></div>' +
+    '<form method="post" action="/projects/{{ project.id }}/pages/' + d.id + '/reaudit" style="margin-left:auto;">' +
+    '<button type="submit" style="background:#059669;color:#fff;border:none;font-size:11px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer;">Re-Audit</button></form>' +
+    '</div>' +
+    '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:16px;">' +
+    '<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:6px;">Title Tag</div>' +
+    '<div style="font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;margin-bottom:8px;word-break:break-word;">' + pmEsc(d.title || 'Missing') + '</div>' +
+    '<ul style="list-style:none;padding:0;margin:0;">' + checklist + '</ul>' +
+    '</div>' +
+    focusedHtml +
+    otherSection +
+    '<a href="/projects/{{ project.id }}/pages/' + d.id + '" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:#4f46e5;text-decoration:underline;">Open full page data (raw meta, headings, images, schema) ↗</a>';
+}
+function pmSuggDecide(id, action) {
+  fetch('/suggestions/' + id + '/' + action, { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); loadPageModal(currentPageModalId, currentPageModalIssueId); })
+    .catch(function(err) { showToast('Could not ' + action + ': ' + err.message, 'error'); });
+}
+function pmSuggEditPrompt(id, current) {
+  var edited = prompt('Edit the suggestion:', current);
+  if (edited === null || !edited.trim()) return;
+  fetch('/suggestions/' + id + '/edit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: edited.trim() }),
+  })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); loadPageModal(currentPageModalId, currentPageModalIssueId); })
+    .catch(function(err) { showToast('Could not save edit: ' + err.message, 'error'); });
+}
+// Deploy tries with no post_id first -- the server auto-resolves it from
+// the page's crawl-time WordPress lookup (routes/crawl.py). Only if that
+// fails (HTTP 400, e.g. homepage/ambiguous slug/never crawled with a WP
+// connection) do we fall back to asking the user for the numeric ID.
+function pmResolveWpPost() {
+  fetch('/projects/{{ project.id }}/pages/' + currentPageModalId + '/resolve-wp-post', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function(summary) {
+      loadPageModal(currentPageModalId, currentPageModalIssueId);
+      showToast(summary.wp_post_id ? 'Linked to WordPress post #' + summary.wp_post_id + '.' : 'Could not find a matching WordPress post for this page.', summary.wp_post_id ? 'success' : 'error');
+    })
+    .catch(function(err) { showToast('Resolve failed: ' + err.message, 'error'); });
+}
+function pmSuggDeploy(id, btn) {
+  // Guard against rapid double/triple-clicks firing multiple deploy
+  // requests (each one a real write + a real revision row) before the
+  // modal reloads and this button is replaced.
+  if (btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.dataset.origText = btn.textContent;
+    btn.textContent = 'Deploying…';
+  }
+  function attempt(body) {
+    return fetch('/suggestions/' + id + '/deploy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+  }
+  attempt({}).then(function(res) {
+    if (res.status === 400) {
+      return res.json().then(function(d) {
+        var postId = prompt((d.detail || "Couldn't auto-detect the WordPress post ID.") + '\n\nThis will be saved for future deploys. Enter it manually (numeric):');
+        if (!postId || !postId.trim() || isNaN(parseInt(postId, 10))) { throw new Error('Deploy cancelled.'); }
+        return attempt({ wp_post_id: parseInt(postId, 10) });
+      });
+    }
+    if (res.status === 422) {
+      // No numeric ID would fix this (e.g. homepage is a post-archive
+      // blog roll, not a single page) -- show the real reason, never the
+      // generic "enter an ID" prompt.
+      return res.json().then(function(d) {
+        var msg = (d.detail && d.detail.message) || 'This suggestion cannot be deployed automatically.';
+        throw new Error(msg);
+      });
+    }
+    return res;
+  })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      return res.json().then(function(rev) {
+        loadPageModal(currentPageModalId, currentPageModalIssueId);
+        showToast('Saved to WordPress. Checking the live page…');
+        if (rev && rev.id) pmWatchRevision(rev.id);
+      });
+    })
+    .catch(function(err) {
+      showToast('Deploy failed: ' + err.message, 'error');
+      // Only re-enable on failure -- on success the modal reloads and
+      // replaces this button entirely.
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🚀 Deploy'; }
+    });
+}
+function pmSuggRollback(id) {
+  fetch('/projects/{{ project.id }}/revisions')
+    .then(function(res) { return res.json(); })
+    .then(function(revisions) {
+      var match = revisions.find(function(r){ return r.suggestion_id === id && !r.rolled_back_at; });
+      if (!match) throw new Error('No active deployment found for this suggestion.');
+      return fetch('/revisions/' + match.id + '/rollback', { method: 'POST' });
+    })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); loadPageModal(currentPageModalId, currentPageModalIssueId); showToast('Rolled back.'); })
+    .catch(function(err) { showToast('Rollback failed: ' + err.message, 'error'); });
+}
+function pmGetSuggestions(issueId) {
+  fetch('/projects/{{ project.id }}/pages/' + currentPageModalId + '/issues/' + issueId + '/suggest', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); loadPageModal(currentPageModalId, currentPageModalIssueId); })
+    .catch(function(err) { showToast('Could not get suggestions: ' + err.message, 'error'); });
+}
+</script>
+
+{% endblock %}

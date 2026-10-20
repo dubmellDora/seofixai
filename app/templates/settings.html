@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Settings — SeoFixAI{% endblock %}
+
+{% block topbar %}
+<div style="display:flex;align-items:center;gap:8px;">
+  <span style="font-size:14px;font-weight:700;color:#0f172a;">Settings</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .provider-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; display:flex; align-items:flex-start; gap:16px; transition:box-shadow .2s, border-color .2s; }
+  .provider-card.active { border-color:#4f46e5; box-shadow:0 0 0 3px #eef2ff; }
+  .switch { position:relative; display:inline-block; width:40px; height:22px; flex-shrink:0; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch-slider { position:absolute; cursor:pointer; inset:0; background:#cbd5e1; transition:.2s; border-radius:22px; }
+  .switch-slider:before { position:absolute; content:""; height:16px; width:16px; left:3px; bottom:3px; background:#fff; transition:.2s; border-radius:50%; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+  .switch input:checked + .switch-slider { background:#4f46e5; }
+  .switch input:checked + .switch-slider:before { transform:translateX(18px); }
+  .switch input:disabled + .switch-slider { cursor:not-allowed; opacity:.5; }
+</style>
+
+<div style="max-width:720px;margin:0 auto;padding:28px 24px;">
+  <div style="margin-bottom:20px;">
+    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Data Provider</div>
+    <div style="font-size:13px;color:#64748b;">Choose which API powers <a href="/onpage-semrush" style="color:#4f46e5;">On-Page Audits</a> and <strong>Backlinks</strong>. One switch, both tools follow it — switching providers doesn't touch data already pulled by the other. (Keyword Research uses its own automatic Semrush→DataForSEO fallback instead, unaffected by this toggle.)</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <!-- DataForSEO -->
+    <div class="provider-card {{ 'active' if active_provider == 'dataforseo' else '' }}">
+      <div style="width:44px;height:44px;border-radius:10px;background:#ecfeff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:15px;color:#0891b2;">DfS</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <span style="font-size:14px;font-weight:700;color:#0f172a;">DataForSEO</span>
+          {% if active_provider == 'dataforseo' %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#4f46e5;">ACTIVE</span>{% endif %}
+          {% if dataforseo_status.configured %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;">Configured</span>
+          {% else %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;">Not configured</span>{% endif %}
+        </div>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:6px;">Instant single-URL checks + site-wide crawl, ~$0.00015/page. Verified working end-to-end (generate → deploy) today.</div>
+        <div style="font-size:11px;color:#94a3b8;">{{ dataforseo_status.detail }}</div>
+      </div>
+      <form method="post" action="/settings/provider/dataforseo/activate">
+        <label class="switch">
+          <input type="checkbox" {{ 'checked' if active_provider == 'dataforseo' else '' }}
+            onchange="this.form.submit()" {{ 'disabled' if active_provider == 'dataforseo' else '' }}>
+          <span class="switch-slider"></span>
+        </label>
+      </form>
+    </div>
+
+    <!-- SEMrush -->
+    <div class="provider-card {{ 'active' if active_provider == 'semrush' else '' }}">
+      <div style="width:44px;height:44px;border-radius:10px;background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:16px;color:#c2410c;">Sr</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <span style="font-size:14px;font-weight:700;color:#0f172a;">SEMrush</span>
+          {% if active_provider == 'semrush' %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#4f46e5;">ACTIVE</span>{% endif %}
+          {% if semrush_status.configured %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;">Configured</span>
+          {% else %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;">Not configured</span>{% endif %}
+        </div>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:6px;">Site Audit API, project-based. Account is currently at zero API units and the Projects cap (14/14) — refresh will fail until that's resolved.</div>
+        <div style="font-size:11px;color:#94a3b8;">{{ semrush_status.detail }}</div>
+      </div>
+      <form method="post" action="/settings/provider/semrush/activate">
+        <label class="switch">
+          <input type="checkbox" {{ 'checked' if active_provider == 'semrush' else '' }}
+            onchange="this.form.submit()" {{ 'disabled' if active_provider == 'semrush' else '' }}>
+          <span class="switch-slider"></span>
+        </label>
+      </form>
+    </div>
+
+  </div>
+
+  <div style="margin:36px 0 20px;">
+    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Site Audit Cooldown</div>
+    <div style="font-size:13px;color:#64748b;">Minimum time required between two completed "Refresh from DataForSEO" crawls of the same project. Blocks accidental re-runs (double-clicks, impatient retries) from billing for a re-crawl of pages that almost certainly haven't changed. A crawl already in progress is always blocked regardless of this setting.</div>
+  </div>
+
+  <div class="provider-card">
+    <div style="width:44px;height:44px;border-radius:10px;background:#f0f9ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:15px;color:#0369a1;">⏱</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">Minimum gap between Site Audit runs</div>
+      <form method="post" action="/settings/site-audit/cooldown" style="display:flex;align-items:center;gap:8px;">
+        <input type="number" name="cooldown_hours" value="{{ site_audit_cooldown_hours }}" min="0" max="720" step="1"
+          style="width:80px;font-size:13px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;">
+        <span style="font-size:12px;color:#64748b;">hours (0 = no cooldown, only blocks overlapping runs)</span>
+        <button type="submit" style="margin-left:auto;padding:7px 14px;border-radius:6px;border:none;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Save</button>
+      </form>
+    </div>
+  </div>
+
+  <div style="margin:36px 0 20px;">
+    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">AI Provider</div>
+    <div style="font-size:13px;color:#64748b;">Choose which model generates fix suggestions, meta optimization, and keyword briefs. Exactly one is active at a time.</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <!-- Claude -->
+    <div class="provider-card {{ 'active' if active_ai_provider == 'claude' else '' }}">
+      <div style="width:44px;height:44px;border-radius:10px;background:#fef3f2;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:16px;color:#c2410c;">Cl</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <span style="font-size:14px;font-weight:700;color:#0f172a;">Claude</span>
+          {% if active_ai_provider == 'claude' %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#4f46e5;">ACTIVE</span>{% endif %}
+          {% if claude_status.configured %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;">Configured</span>
+          {% else %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;">Not configured</span>{% endif %}
+        </div>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:6px;">claude-haiku-4-5. The original, proven provider — every suggestion/meta/brief feature was built and tested against this.</div>
+        <div style="font-size:11px;color:#94a3b8;">{{ claude_status.detail }}</div>
+      </div>
+      <form method="post" action="/settings/ai-provider/claude/activate">
+        <label class="switch">
+          <input type="checkbox" {{ 'checked' if active_ai_provider == 'claude' else '' }}
+            onchange="this.form.submit()" {{ 'disabled' if active_ai_provider == 'claude' else '' }}>
+          <span class="switch-slider"></span>
+        </label>
+      </form>
+    </div>
+
+    <!-- Gemini -->
+    <div class="provider-card {{ 'active' if active_ai_provider == 'gemini' else '' }}">
+      <div style="width:44px;height:44px;border-radius:10px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;font-size:16px;color:#4338ca;">Ge</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <span style="font-size:14px;font-weight:700;color:#0f172a;">Gemini</span>
+          {% if active_ai_provider == 'gemini' %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#4f46e5;">ACTIVE</span>{% endif %}
+          {% if gemini_status.configured %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;">Configured</span>
+          {% else %}<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;">Not configured</span>{% endif %}
+        </div>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:6px;">gemini-flash-latest. Newer, being validated — verify output quality before relying on it for client-facing suggestions.</div>
+        <div style="font-size:11px;color:#94a3b8;">{{ gemini_status.detail }}</div>
+      </div>
+      <form method="post" action="/settings/ai-provider/gemini/activate">
+        <label class="switch">
+          <input type="checkbox" {{ 'checked' if active_ai_provider == 'gemini' else '' }}
+            onchange="this.form.submit()" {{ 'disabled' if active_ai_provider == 'gemini' else '' }}>
+          <span class="switch-slider"></span>
+        </label>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- API error log: raw, credentials redacted -->
+  <div id="logs" style="margin-top:36px;">
+    <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">API error log</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:12px;line-height:1.5;">Every warning and error the server logged, raw, with tracebacks, newest first (the last 2,000 are kept). Credentials are replaced with <code>[redacted]</code> before anything is stored. Provider failures (DataForSEO, SEMrush, Claude, WordPress, Google) show up here with the endpoint and the reason the provider gave.</div>
+
+    <form method="get" action="/settings#logs" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <select name="level" style="font-size:12px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;">
+        <option value="all" {{ 'selected' if log_level == 'all' }}>All levels</option>
+        {% for lv in log_levels %}<option value="{{ lv }}" {{ 'selected' if log_level == lv }}>{{ lv }}</option>{% endfor %}
+      </select>
+      <select name="project" style="font-size:12px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;max-width:220px;">
+        <option value="all" {{ 'selected' if log_project == 'all' }}>All projects</option>
+        {% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if log_project == p.id|string }}>{{ p.name }} ({{ p.base_url }})</option>{% endfor %}
+      </select>
+      <input type="search" name="q" value="{{ log_q }}" placeholder="Search message or logger (e.g. dataforseo, 402, provider_failed)" style="flex:1;min-width:200px;font-size:12px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;">
+      <button type="submit" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;cursor:pointer;">Filter</button>
+      <a href="/settings/logs.txt?level={{ log_level }}&q={{ log_q|urlencode }}&project={{ log_project }}" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#334155;text-decoration:none;">Download raw .txt</a>
+      <button type="button" onclick="copyLogs(this)" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;">Copy shown</button>
+    </form>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Showing {{ log_entries|length }} of {{ log_total }} matching entr{{ 'y' if log_total == 1 else 'ies' }}.</div>
+
+    <div id="log-box" style="background:#0f172a;border-radius:12px;padding:12px 14px;max-height:520px;overflow:auto;">
+      {% for e in log_entries %}
+      <div style="padding:8px 0;{% if not loop.last %}border-bottom:1px solid #1e293b;{% endif %}">
+        <div style="font-family:ui-monospace,Consolas,monospace;font-size:11px;margin-bottom:3px;">
+          <span style="color:#94a3b8;">{{ e.row.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.row.created_at else '?' }} UTC</span>
+          <span style="margin-left:8px;font-weight:700;color:{% if e.row.level == 'WARNING' %}#fbbf24{% else %}#f87171{% endif %};">{{ e.row.level }}</span>
+          <span style="margin-left:8px;color:#7dd3fc;">{{ e.row.logger }}</span>
+          {% if e.project_label %}<span style="margin-left:8px;color:#a78bfa;">[{{ e.project_label }}]</span>{% endif %}
+        </div>
+        <pre class="log-text" style="margin:0;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.5;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;">{{ e.row.message }}</pre>
+      </div>
+      {% else %}
+      <div style="font-size:12px;color:#94a3b8;padding:14px 4px;">No log entries{% if log_level != 'all' or log_q or log_project != 'all' %} match this filter{% endif %}. Errors appear here as they happen.</div>
+      {% endfor %}
+    </div>
+
+    {% if log_total %}
+    <form method="post" action="/settings/logs/clear" onsubmit="return confirm('Delete every stored log entry? This cannot be undone.');" style="margin-top:10px;">
+      <button type="submit" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer;">Clear the log</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  function copyLogs(btn) {
+    var text = Array.prototype.map.call(document.querySelectorAll('#log-box > div'), function (d) { return d.innerText.trim(); }).join('\n\n');
+    var done = function () { var old = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = old; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, done); return; }
+    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); done();
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,1460 @@
+{% extends "base.html" %}
+{% block title %}On-Page SEMrush/DataForSEO — {{ project.name }}{% endblock %}
+
+{% block topbar %}
+<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px;min-width:0;">
+  <div style="min-width:0;flex:1;">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:3px;display:flex;align-items:center;gap:4px;">
+      <a href="/" style="color:#94a3b8;text-decoration:none;">Projects</a>
+      <span style="opacity:0.4;">/</span>
+      <span style="color:#0f172a;font-weight:600;">On-Page SEMrush</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;">{{ target }}</div>
+      <span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#eef2ff;color:#4f46e5;font-weight:700;">Sourced from {{ active_provider_label }}</span>
+      <a href="/settings" style="font-size:10px;color:#94a3b8;text-decoration:none;border-bottom:1px dotted #cbd5e1;">change</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f1f5f9;color:#475569;">
+        🔄 Last checked: {{ pages[0].updated_at.strftime('%Y-%m-%d %H:%M') if pages else 'Never' }}
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f0f9ff;color:#0369a1;">
+        🤖 AI: Claude
+      </span>
+      {% if not_configured %}
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#fef2f2;color:#b91c1c;">
+        ⚠️ DATAFORSEO_LOGIN/PASSWORD not set
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+    <button onclick="openDrawer('profile-drawer')" title="Business profile — context for AI suggestions"
+      style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+      onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+      <span style="width:7px;height:7px;border-radius:50%;background:{{ '#22c55e' if profile and profile.brand else '#cbd5e1' }};flex-shrink:0;"></span>
+      🏢 Business Profile
+    </button>
+    <button onclick="openDrawer('wp-drawer')" title="{{ 'WordPress connected' if wp_conn and wp_conn.last_verify_ok else 'WordPress not connected' }}"
+      style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:{{ '#16a34a' if wp_conn and wp_conn.last_verify_ok else '#94a3b8' }};font-size:12px;font-weight:600;cursor:pointer;">
+      {% if wp_conn and wp_conn.last_verify_ok %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
+      {% else %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="m19 5 3-3"/><path d="m2 22 3-3"/><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m7.5 13.5 2.5-2.5"/><path d="m10.5 16.5 2.5-2.5"/><path d="M12 6l6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z"/></svg>
+      {% endif %}
+      WordPress
+    </button>
+    <button type="button" onclick="openDrawer('gsc-drawer')" title="{{ 'Google Search Console connected' if gsc_connection and gsc_connection.status == 'active' else ('Google OAuth is not configured' if not gsc_configured else 'Connect Google Search Console') }}"
+      style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:{{ '#15803d' if gsc_connection and gsc_connection.status == 'active' else '#374151' }};font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18"/><path stroke-linecap="round" stroke-linejoin="round" d="m7 14 4-4 3 3 6-7"/></svg>
+      Google Search Console
+      <span style="width:6px;height:6px;border-radius:50%;background:{{ '#22c55e' if gsc_connection and gsc_connection.status == 'active' else ('#ef4444' if gsc_connection and gsc_connection.status == 'revoked' else '#cbd5e1') }};flex-shrink:0;"></span>
+    </button>
+    <a href="/projects/{{ project.id }}/onpage/export" title="Export full on-page report as CSV"
+      style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export Report
+    </a>
+    {% if active_provider == 'dataforseo' %}
+    <button type="button" onclick="openRefreshModal()" title="Refresh from DataForSEO — ~$0.00015/page"
+      style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:6px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(79,70,229,0.25);white-space:nowrap;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+      Refresh
+    </button>
+    <form id="refresh-form" method="post" action="/projects/{{ project.id }}/onpage/site-audit/start" style="display:none;">
+      <input type="hidden" id="refresh-max-pages-field" name="max_crawl_pages" value="{{ default_max_crawl_pages }}">
+    </form>
+    <button onclick="openDrawer('instant-drawer')" title="Instant Check (1 URL)"
+      style="font-size:12px;font-weight:600;color:#334155;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;white-space:nowrap;">
+      Instant Check
+    </button>
+    {% else %}
+    <span style="font-size:11px;color:#b91c1c;background:#fef2f2;padding:4px 10px;border-radius:6px;" title="SEMrush account is at zero API units — see Settings for details.">
+      ⚠️ SEMrush refresh not available yet
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block status_bar %}
+{% set in_flight_tasks = tasks | selectattr('status', 'equalto', 'posted') | list if tasks else [] %}
+<div id="audit-status-bar" style="display:{{ 'flex' if in_flight_tasks else 'none' }};flex-direction:column;gap:6px;padding:8px 20px;background:#eef2ff;border-bottom:1px solid #e2e8f0;font-size:12px;color:#4338ca;flex-shrink:0;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="width:12px;height:12px;border:2px solid #c7d2fe;border-top-color:#4f46e5;border-radius:50%;display:inline-block;animation:vtx-spin 0.8s linear infinite;"></span>
+    <span id="audit-status-text">Site audit in progress…</span>
+  </div>
+  <div style="height:4px;background:#c7d2fe;border-radius:2px;overflow:hidden;">
+    <div id="audit-progress-fill" style="height:100%;width:0%;background:#4f46e5;transition:width 1s linear;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# health is computed server-side in routes/onpage_semrush.py:onpage_view --
+   only score_eligible issues move it; error_count/warning_count below are
+   still the real totals across every stored issue. #}
+
+<style>
+
+  details.ig { margin-bottom:5px; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; background:#fff; transition:box-shadow .2s; }
+  details.ig[open] { box-shadow:0 4px 16px rgba(0,0,0,0.06); }
+  details.ig summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:12px 16px; background:#fff; transition:background .15s; }
+  details.ig summary::-webkit-details-marker { display:none; }
+  details.ig summary:hover { background:#f8fafc; }
+  details.ig[open] summary { background:#f8faff; border-bottom:1px solid #e0e7ff; }
+  details.ig summary .caret { transition:transform .2s; flex-shrink:0; }
+  details.ig[open] summary .caret { transform:rotate(90deg); }
+  .ig-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .ig-table th { padding:8px 16px; text-align:left; font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid #f1f5f9; background:#fafafa; }
+  .ig-table td { padding:9px 16px; border-bottom:1px solid #f8fafc; vertical-align:middle; }
+  .ig-table tr:last-child td { border-bottom:none; }
+  .ig-table tr:hover td { background:#f8fafc; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+  .badge-pending { background:#e2e8f0; color:#475569; }
+  .badge-accepted { background:#d1fae5; color:#065f46; }
+  .badge-error { background:#fee2e2; color:#b91c1c; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  #drawer-backdrop { display:none; position:fixed; inset:0; background:rgba(15,23,42,.25); z-index:400; }
+  .vtx-drawer { position:fixed; top:0; right:0; width:420px; max-width:95vw; height:100vh; background:#fff; box-shadow:-8px 0 40px rgba(0,0,0,.14); z-index:401; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .28s cubic-bezier(.4,0,.2,1); }
+  .vtx-drawer.open { transform:translateX(0); }
+  .drawer-head { padding:18px 20px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .drawer-body { flex:1; overflow-y:auto; padding:16px 20px; }
+  .drawer-foot { padding:14px 20px; border-top:1px solid #e2e8f0; display:flex; gap:8px; justify-content:flex-end; flex-shrink:0; }
+  .dinput { font-size:12px; padding:5px 10px; border:1px solid #e2e8f0; border-radius:6px; color:#0f172a; outline:none; background:#fff; transition:border-color .15s; }
+  .dinput:focus { border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.1); }
+
+  #toast-wrap { position:fixed; bottom:24px; right:24px; z-index:1000; display:flex; flex-direction:column; gap:8px; }
+  .vtx-toast { background:#0f172a; color:#fff; font-size:12px; font-weight:600; padding:10px 16px; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.2); opacity:0; transform:translateY(8px); transition:opacity .2s,transform .2s; }
+  .vtx-toast.show { opacity:1; transform:translateY(0); }
+  .vtx-toast.error { background:#dc2626; }
+</style>
+
+{% include "onpage/_kpis.html" %}
+
+<div id="backlinks" style="margin:16px 24px 0;padding:16px 18px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;scroll-margin-top:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:13px;font-weight:700;color:#0f172a;">🔗 Backlink Analytics</span>
+      <span id="bl-source-badge" style="display:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#374151;">
+        <input type="checkbox" id="bl-sched-enabled"> Weekly auto-pull
+      </label>
+      <button onclick="saveBacklinkSchedule()" style="padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+      <button onclick="refreshBacklinks()" id="bl-refresh-btn" style="padding:5px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:700;cursor:pointer;">Refresh now</button>
+    </div>
+  </div>
+
+  <div id="bl-body" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">
+    <div style="grid-column:1/-1;font-size:12px;color:#94a3b8;">Loading…</div>
+  </div>
+
+  <div id="bl-extras" style="display:none;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Referring TLDs</div>
+      <div id="bl-tld-bars"></div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Linking Site Types</div>
+      <div id="bl-platform-bars"></div>
+    </div>
+  </div>
+
+  <details class="ig" id="bl-records-details" style="border:1px solid #e2e8f0;">
+    <summary style="padding:8px 12px;">
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#0f172a;flex:1;">Backlink list</span>
+      <span id="bl-records-count" style="font-size:11px;color:#94a3b8;"></span>
+    </summary>
+    <div style="padding:12px;">
+      <div style="display:flex;gap:2px;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:10px;max-width:280px;">
+        {% for t in ['active','new','lost'] %}
+        <button onclick="switchBlTab(this,'{{ t }}')" data-bltab="{{ t }}"
+          style="flex:1;padding:5px 8px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer;{% if loop.first %}background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(0,0,0,.07);{% else %}background:transparent;color:#64748b;{% endif %}">
+          {{ t|title }}
+        </button>
+        {% endfor %}
+      </div>
+      <div id="bl-records-body" style="font-size:12px;color:#94a3b8;">Loading…</div>
+    </div>
+  </details>
+</div>
+
+{% include "onpage/_category_strip.html" %}
+
+{% if tasks %}
+<div style="margin:16px 24px 0;">
+  <details style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;">
+    <summary style="padding:10px 16px;font-size:12px;font-weight:700;color:#0f172a;cursor:pointer;">🕷️ Site audit tasks ({{ tasks|length }}) — DataForSEO's own crawler</summary>
+    <table class="ig-table">
+      <tr><th>Task</th><th>Status</th><th>Pages</th><th>Started</th><th></th></tr>
+      {% for t in tasks %}
+      <tr>
+        <td>{{ t.dataforseo_task_id[:12] }}…</td>
+        <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:{% if t.status == 'fetched' %}#dcfce7;color:#15803d{% elif t.status == 'error' %}#fee2e2;color:#dc2626{% else %}#f1f5f9;color:#475569{% endif %};">{{ t.status }}</span></td>
+        <td>{{ t.pages_crawled or '—' }}</td>
+        <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>
+          {% if t.status == 'posted' %}
+          <span style="font-size:11px;color:#94a3b8;">Auto-checking…</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
+</div>
+{% endif %}
+
+{% if grouped_issues %}
+<div id="issues-section" style="padding:20px 24px 32px;scroll-margin-top:16px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+    <div style="width:28px;height:28px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"/></svg>
+    </div>
+    <span style="font-size:15px;font-weight:700;color:#0f172a;">🗂️ Issues by category</span>
+    <span style="font-size:11px;background:#eef2ff;color:#4f46e5;padding:2px 9px;border-radius:10px;font-weight:700;">{{ grouped_issues.values()|select|list|length }} of {{ grouped_issues|length }} with issues</span>
+    <span style="font-size:11px;color:#94a3b8;margin-left:auto;">{{ total_issues }} total on-page issues across {{ total_pages }} pages</span>
+  </div>
+
+  {% include "onpage/_toolbar.html" %}
+
+  <div id="issues-filter-banner" style="display:none;align-items:center;gap:8px;margin-bottom:14px;padding:8px 12px;border-radius:8px;background:#eef2ff;border:1px solid #e0e7ff;">
+    <span style="font-size:12px;color:#4338ca;font-weight:600;">Showing: <span id="issues-filter-label"></span></span>
+    <button type="button" onclick="filterIssues('all')" style="margin-left:auto;font-size:11px;font-weight:700;color:#4f46e5;background:none;border:none;cursor:pointer;padding:0;">Clear filter ✕</button>
+  </div>
+
+  {% for category, cat_issues in grouped_issues.items() %}
+  {# err_n/warn_n = score-eligible only (what Site Health counts); opp_n = the
+     rest -- still listed below, just not scored. #}
+  {% set scored = cat_issues|selectattr('score_eligible')|list %}
+  {% set err_n = scored|selectattr('severity','eq','error')|list|length %}
+  {% set warn_n = scored|selectattr('severity','eq','warning')|list|length %}
+  {% set opp_n = cat_issues|length - scored|length %}
+  {% set accent = cat_colors.get(category, '#4f46e5') %}
+  {% set label = cat_labels.get(category, category|replace('_',' ')|title) %}
+  {% set is_clean = not cat_issues %}
+
+  <details class="ig" data-cat="{{ category }}" style="border-left:3px solid {{ '#e2e8f0' if is_clean else accent }};">
+    <summary>
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+      <span style="width:8px;height:8px;border-radius:50%;background:{{ '#cbd5e1' if is_clean else accent }};flex-shrink:0;"></span>
+      <span style="font-size:13px;font-weight:600;color:{{ '#94a3b8' if is_clean else '#0f172a' }};flex:1;">{{ label }}</span>
+      {% if is_clean %}
+      <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700;">clean</span>
+      {% else %}
+      <span style="font-size:11px;color:#94a3b8;margin-right:12px;">{{ cat_issues|length }} affected page{{ 's' if cat_issues|length != 1 }}</span>
+      {% if err_n > 0 %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fee2e2;color:#dc2626;font-weight:700;margin-right:4px;">{{ err_n }} error{% if err_n != 1 %}s{% endif %}</span>{% endif %}
+      {% if warn_n > 0 %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fef9c3;color:#a16207;font-weight:700;margin-right:4px;">{{ warn_n }} warning{% if warn_n != 1 %}s{% endif %}</span>{% endif %}
+      {% if opp_n > 0 %}<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#e0f2fe;color:#0369a1;font-weight:700;" title="Shown for visibility; doesn't affect Site Health">{{ opp_n }} opportunit{{ 'y' if opp_n == 1 else 'ies' }}</span>{% endif %}
+      {% endif %}
+    </summary>
+    {% if is_clean %}
+    <div style="padding:16px 18px;color:#94a3b8;font-size:12px;">No {{ label|lower }} issues found across {{ total_pages }} crawled page{{ 's' if total_pages != 1 }}. 🎉</div>
+    {% else %}
+    {% include "onpage/_issue_rows.html" %}
+    {% endif %}
+  </details>
+  {% endfor %}
+</div>
+
+{% else %}
+<div id="issues-section" style="padding:64px 24px;text-align:center;scroll-margin-top:16px;">
+  <div style="max-width:380px;margin:0 auto;">
+    <div style="font-size:48px;margin-bottom:16px;">🔄</div>
+    <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">No data yet</div>
+    <div style="font-size:13px;color:#64748b;">
+      {% if active_provider != 'dataforseo' %}
+      SEMrush isn't wired up to pull issues yet — switch back to DataForSEO in <a href="/settings" style="color:#4f46e5;">Settings</a>, or wait until the SEMrush account has API units again.
+      {% else %}Click <strong>Refresh from DataForSEO</strong> or <strong>Instant Check</strong> above to pull real on-page data for the first time.{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Instant Check drawer -->
+<div id="instant-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="font-size:14px;font-weight:700;color:#0f172a;">⚡ Instant on-page check</div>
+    <button onclick="closeDrawer('instant-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;">×</button>
+  </div>
+  <div class="drawer-body">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px;">DataForSEO's <code>instant_pages</code> endpoint — live, synchronous, one URL at a time. ~$0.00015/page.</div>
+    <form method="post" action="/projects/{{ project.id }}/onpage/instant-check">
+      <label style="display:block;font-size:12px;font-weight:500;color:#64748b;margin-bottom:4px;">URL</label>
+      <input name="url" placeholder="https://{{ target }}/some-page" required style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:12px;">
+      <button type="submit" style="width:100%;padding:9px;background:#4f46e5;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Check now</button>
+    </form>
+  </div>
+</div>
+
+<!-- WordPress drawer -->
+<div id="wp-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="font-size:14px;font-weight:700;color:#0f172a;">WordPress connection</div>
+    <button onclick="closeDrawer('wp-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;">×</button>
+  </div>
+  <div class="drawer-body">
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Connects via the AI SEO Connector plugin so accepted suggestions can deploy straight to the site.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <a href="/downloads/ai-seo-connector" style="flex:1;text-align:center;padding:7px;background:#eef2ff;color:#4f46e5;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;">⬇ Download plugin (.zip)</a>
+      <a href="https://github.com/dubmellDora/seofixai/blob/main/docs/wordpress-plugin-guide.md" target="_blank" style="flex:1;text-align:center;padding:7px;background:#f1f5f9;color:#334155;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;">Setup guide</a>
+    </div>
+    {% if wp_conn %}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:#64748b;">
+      {{ wp_conn.site_url }}
+      {% if wp_conn.last_verify_ok %}<span class="badge badge-accepted">verified</span>
+      {% elif wp_conn.last_verify_ok is none %}<span class="badge badge-pending">not tested</span>
+      {% else %}<span class="badge badge-error">failed</span>{% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:11px;color:#94a3b8;">
+      <span>Token:</span>
+      <code style="font-family:monospace;background:#f1f5f9;padding:1px 6px;border-radius:4px;letter-spacing:1px;">{{ wp_token_preview }}</code>
+    </div>
+    <button type="button" onclick="testWordPressConnection()" style="width:100%;padding:7px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px;">Test connection</button>
+    <div id="wp-test-result" style="font-size:11px;margin-bottom:14px;min-height:14px;"></div>
+    {% endif %}
+    <label style="display:block;font-size:12px;font-weight:500;color:#64748b;margin-bottom:4px;">Site URL</label>
+    <input id="wp-site-url" value="{{ wp_conn.site_url if wp_conn else 'https://' + target }}" placeholder="https://client-site.com" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:10px;">
+    <label style="display:block;font-size:12px;font-weight:500;color:#64748b;margin-bottom:4px;">API Token</label>
+    <input id="wp-api-token" type="password" placeholder="Bearer token from the plugin dashboard" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:12px;">
+    <button type="button" onclick="saveWordPressConnection()" style="width:100%;padding:9px;background:#4f46e5;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">{{ 'Update connection' if wp_conn else 'Save connection' }}</button>
+    <div id="wp-save-result" style="font-size:11px;margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- Google Search Console drawer -->
+<div id="gsc-drawer" class="vtx-drawer">
+  <div class="drawer-head">
+    <div style="font-size:14px;font-weight:700;color:#0f172a;">Google Search Console</div>
+    <button type="button" onclick="closeDrawer('gsc-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;">×</button>
+  </div>
+  <div class="drawer-body">
+    <div style="font-size:11px;color:#64748b;margin-bottom:14px;">Read-only Search Console access for this project. Connect the Google account that already has permission to the client's property.</div>
+    {% if not gsc_configured %}
+      <div style="padding:12px;border:1px solid #fed7aa;background:#fff7ed;border-radius:8px;font-size:12px;color:#9a3412;">
+        <strong>OAuth setup pending</strong>
+        <p style="margin:6px 0 0;">This server is not configured for Google OAuth yet. Once your Cloudflare HTTPS hostname is ready, set <code>GOOGLE_OAUTH_REDIRECT_URI</code> to that hostname plus <code>/gsc/callback</code>, and register the exact same URI in Google Cloud Console.</p>
+      </div>
+    {% elif not gsc_connection %}
+      <div style="font-size:12px;color:#64748b;margin-bottom:12px;">No Google account is connected to this project yet.</div>
+      <a href="/projects/{{ project.id }}/gsc/connect" style="display:block;text-align:center;padding:9px 12px;border-radius:7px;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">Connect Google Search Console</a>
+    {% else %}
+      <div style="font-size:12px;font-weight:700;color:{{ '#15803d' if gsc_connection.status == 'active' else '#dc2626' }};margin-bottom:4px;">
+        {% if gsc_connection.status == 'active' %}Connected{% elif gsc_connection.status == 'revoked' %}Reconnect needed{% else %}Connection error{% endif %}
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:12px;">Google account: {{ gsc_connection.google_account_email }}</div>
+      {% if gsc_connection.status != 'active' %}
+        <a href="/projects/{{ project.id }}/gsc/connect" style="display:block;text-align:center;padding:8px 12px;border-radius:7px;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;text-decoration:none;margin-bottom:12px;">Reconnect Google account</a>
+      {% endif %}
+      {% if gsc_properties %}
+        <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">Available properties</div>
+        {% for p in gsc_properties %}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+          <div style="min-width:0;">
+            <div style="font-size:12px;color:#334155;overflow-wrap:anywhere;">{{ p.site_url }}</div>
+            <div style="font-size:10px;color:#94a3b8;">{{ p.permission_level or 'permission unknown' }}</div>
+          </div>
+          {% if p.selected %}
+            <span style="font-size:10px;font-weight:700;color:#4f46e5;white-space:nowrap;">Selected</span>
+          {% else %}
+            <button type="button" onclick="selectGscProperty({{ p.id }})" style="padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#374151;font-size:11px;font-weight:600;cursor:pointer;">Select</button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">No properties were found. Confirm this Google account has Search Console access to the client site, then reconnect.</div>
+      {% endif %}
+      <button type="button" onclick="disconnectGsc()" style="width:100%;margin-top:14px;padding:8px 10px;border-radius:6px;border:1px solid #fecaca;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;">Disconnect Google account</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Business Profile drawer -->
+<div id="profile-drawer" class="vtx-drawer">
+  <form method="post" action="/projects/{{ project.id }}/business-profile" style="display:flex;flex-direction:column;height:100%;">
+    <div class="drawer-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;">🏢</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#0f172a;">🏢 Business Profile</div>
+          <div style="font-size:11px;color:#94a3b8;">Context the AI uses for localized suggestions</div>
+        </div>
+      </div>
+      <button type="button" onclick="closeDrawer('profile-drawer')" style="width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input type="hidden" name="return_to" value="/projects/{{ project.id }}/onpage"/>
+    <div class="drawer-body">
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Brand</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="brand" value="{{ profile.brand or '' if profile else '' }}" placeholder="e.g. VTraffic.io"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Industry</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="industry" value="{{ profile.industry or '' if profile else '' }}" placeholder="e.g. Digital Marketing"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Services <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="services" placeholder="e.g. SEO, PPC, social media management">{{ profile.services|join(', ') if profile and profile.services else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Locations <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="locations" placeholder="e.g. Patna, Bihar, India">{{ profile.locations|join(', ') if profile and profile.locations else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Audiences <span style="color:#94a3b8;font-weight:400;">(comma-separated)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="audiences" placeholder="e.g. small business owners, e-commerce startups">{{ profile.audiences|join(', ') if profile and profile.audiences else '' }}</textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">Brand Tone</label>
+        <input class="dinput" style="width:100%;box-sizing:border-box;" name="tone" value="{{ profile.tone or '' if profile else '' }}" placeholder="e.g. friendly, professional, Hindi-English mix"/>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#475569;font-weight:500;margin-bottom:4px;">USP <span style="color:#94a3b8;font-weight:400;">(what makes it different)</span></label>
+        <textarea class="dinput" style="width:100%;box-sizing:border-box;resize:vertical;" rows="2" name="usp" placeholder="e.g. only same-day SEO audit turnaround in the region">{{ profile.usp or '' if profile else '' }}</textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button type="button" onclick="closeDrawer('profile-drawer')" style="padding:7px 16px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button type="submit" style="padding:7px 18px;border-radius:7px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(79,70,229,.3);">Save Profile</button>
+    </div>
+  </form>
+</div>
+
+<div id="drawer-backdrop" onclick="closeAllDrawers()"></div>
+
+{% include "onpage/_fix_modal.html" %}
+{% include "onpage/_fix_panels.html" %}
+
+<!-- Refresh cost confirmation modal (API reminder) -->
+<div id="refresh-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:900;" onclick="closeRefreshModal()"></div>
+<div id="refresh-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,92vw);background:#fff;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.28);z-index:901;">
+  <div style="padding:20px;text-align:center;">
+    <div style="width:44px;height:44px;border-radius:12px;background:#eef2ff;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
+    </div>
+    <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px;">This spends real API credit</div>
+    <div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:10px;">DataForSEO will crawl up to the page count below for {{ target }} at <strong>~$0.00015/page</strong>. Continue?</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+      <label for="refresh-max-pages-input" style="font-size:12px;color:#334155;font-weight:600;">Max pages</label>
+      <input type="number" id="refresh-max-pages-input" min="1" max="{{ max_crawl_pages_cap }}" value="{{ default_max_crawl_pages }}"
+        oninput="updateRefreshCostEstimate()"
+        style="width:90px;padding:6px 8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;text-align:center;">
+      <button type="button" id="refresh-max-pages-save-btn" onclick="saveDefaultMaxPages(this)" title="Remember this value for {{ project.name }}"
+        style="padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#4f46e5;font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+    </div>
+    <div id="refresh-cost-estimate" style="font-size:11px;color:#94a3b8;margin-bottom:18px;">Estimated cost: ~$0.015</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeRefreshModal()" style="flex:1;padding:9px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button id="refresh-confirm-btn" onclick="submitRefreshForm(this)" style="flex:1;padding:9px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Refresh now</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+function openDrawer(id) { document.getElementById('drawer-backdrop').style.display = 'block'; document.getElementById(id).classList.add('open'); }
+function closeDrawer(id) { document.getElementById(id).classList.remove('open'); if (!document.querySelectorAll('.vtx-drawer.open').length) document.getElementById('drawer-backdrop').style.display = 'none'; }
+function closeAllDrawers() { document.querySelectorAll('.vtx-drawer').forEach(d => d.classList.remove('open')); document.getElementById('drawer-backdrop').style.display = 'none'; }
+
+function showToast(msg, type) {
+  var wrap = document.getElementById('toast-wrap');
+  if (!wrap) return;
+  var t = document.createElement('div');
+  t.className = 'vtx-toast ' + (type || 'success');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ t.classList.add('show'); }); });
+  setTimeout(function(){
+    t.classList.remove('show');
+    setTimeout(function(){ t.remove(); }, 320);
+  }, 3200);
+}
+
+var PROJECT_ID = {{ project.id }};
+
+{# Jinja {% set %} doesn't cross block boundaries -- status_bar block above
+   computed its own copy of in_flight_tasks for the strip's visibility;
+   this recomputes the same filter here since this script lives in the
+   content block, a separate scope. #}
+{% set in_flight_tasks = tasks | selectattr('status', 'equalto', 'posted') | list if tasks else [] %}
+
+// ── Site audit auto-poll (replaces the old manual "Check status" button)
+// ──────────────────────────────────────────────────────────────────────
+// DataForSEO's task API has no progress percentage -- is_task_ready() is a
+// plain boolean -- so this can only show elapsed time plus a rough "usually
+// takes about" estimate, never a real X-of-Y bar (see the crawl-progress
+// work in project_detail.html for the version of this that CAN show a real
+// bar, because our own crawler streams results page-by-page).
+var IN_FLIGHT_TASKS = {{ in_flight_tasks | map(attribute='id') | list | tojson }};
+var AUDIT_TASK_STARTED_AT = {{ (in_flight_tasks[0].created_at.isoformat() ~ 'Z') | tojson if in_flight_tasks else 'null' }};
+var AUDIT_TASK_MAX_PAGES = {{ (in_flight_tasks[0].max_crawl_pages or 100) | tojson if in_flight_tasks else 'null' }};
+
+function auditStatusText() {
+  if (!AUDIT_TASK_STARTED_AT) return 'Site audit in progress…';
+  var elapsedMs = Date.now() - new Date(AUDIT_TASK_STARTED_AT).getTime();
+  var elapsedMin = Math.max(0, Math.round(elapsedMs / 60000));
+  // Rough heuristic, not a measured rate: DataForSEO typically processes on
+  // the order of ~1-2 pages/sec for on-page crawls. Labeled "usually" on
+  // purpose so it never reads as a promise.
+  var estMin = Math.max(1, Math.round(AUDIT_TASK_MAX_PAGES / 90));
+  return 'Site audit in progress — ' + elapsedMin + 'm elapsed (usually takes about ' + estMin + 'm for up to ' + AUDIT_TASK_MAX_PAGES + ' pages)';
+}
+
+// Percentage is purely a local time-based estimate (elapsed / usually-takes)
+// -- DataForSEO's task API has no real progress fraction to read (see the
+// comment above IN_FLIGHT_TASKS). Capped at 95% so the bar never claims
+// "done" on its own; only an actual "fetched" result does that.
+function auditProgressPercent() {
+  if (!AUDIT_TASK_STARTED_AT) return 5;
+  var elapsedMs = Date.now() - new Date(AUDIT_TASK_STARTED_AT).getTime();
+  var estMs = Math.max(1, Math.round(AUDIT_TASK_MAX_PAGES / 90)) * 60000;
+  return Math.max(5, Math.min(95, Math.round((elapsedMs / estMs) * 100)));
+}
+
+function renderAuditStatus() {
+  var text = document.getElementById('audit-status-text');
+  var fill = document.getElementById('audit-progress-fill');
+  if (text) text.textContent = auditStatusText();
+  if (fill) fill.style.width = auditProgressPercent() + '%';
+}
+
+// One-shot check against the backend, NOT a repeating poll -- see
+// AgentLog for why the old setTimeout(pollSiteAuditTasks, 6000) loop was
+// removed: it re-called itself forever on a stuck/errored task with no
+// upper bound, which is what caused the site to appear to "spin" for
+// days. Now: check once when the page loads: if the crawl already
+// finished (or errored) in the meantime, reload to show the result. If
+// it's still running, just render the progress bar (renderAuditStatus,
+// on a local timer below -- no further network calls) and let the user
+// leave and come back; the next page load repeats this same one-shot
+// check, same as a normal page always showing its current data.
+function checkSiteAuditOnce() {
+  if (!IN_FLIGHT_TASKS.length) return;
+  Promise.all(IN_FLIGHT_TASKS.map(function(taskId) {
+    return fetch('/projects/' + PROJECT_ID + '/onpage/site-audit/' + taskId + '/check', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .catch(function() { return { status: 'posted' }; });
+  })).then(function(results) {
+    var stillWaiting = results.some(function(r) { return r.status === 'posted'; });
+    if (!stillWaiting) location.reload();
+  });
+}
+
+if (IN_FLIGHT_TASKS.length) {
+  renderAuditStatus();
+  checkSiteAuditOnce();
+  // Cosmetic only -- re-renders the elapsed-time text and progress bar
+  // width from local Date.now() math every 15s. No fetch() here, so this
+  // never hits the server and cannot loop forever the way the old poll did.
+  setInterval(renderAuditStatus, 15000);
+}
+
+{% if refresh_blocked %}
+{# request.query_params already decodes +/%XX to real text (Starlette's
+   parse_qsl), so refresh_blocked here is plain readable text, not raw
+   query-string encoding -- no further unescaping needed. #}
+showToast({{ refresh_blocked|tojson }}, 'error');
+history.replaceState(null, '', location.pathname + location.hash);
+{% endif %}
+
+// ── Backlink Analytics ──────────────────────────────
+function blStat(label, value, color) {
+  return `<div><div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">${label}</div>` +
+    `<div style="font-size:20px;font-weight:800;color:${color || '#0f172a'};">${value ?? '—'}</div></div>`;
+}
+// Deterministic threshold, not AI -- spam score is a fact from the
+// provider, this just colors it (plain if/else on a number).
+function spamColor(score) {
+  if (score == null) return '#0f172a';
+  if (score >= 30) return '#dc2626';
+  if (score >= 15) return '#d97706';
+  return '#16a34a';
+}
+function blBar(label, value, max, color) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return `<div style="margin-bottom:7px;">
+    <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+      <span style="color:#374151;font-weight:600;">${label}</span>
+      <span style="color:#94a3b8;">${value.toLocaleString()}</span>
+    </div>
+    <div style="background:#f1f5f9;border-radius:4px;height:6px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>
+    </div>
+  </div>`;
+}
+function renderDistribution(elId, dist, color) {
+  const el = document.getElementById(elId);
+  if (!dist) { el.innerHTML = '<div style="font-size:11px;color:#cbd5e1;">Not available from this provider.</div>'; return; }
+  const entries = Object.entries(dist).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = entries.length ? entries[0][1] : 0;
+  el.innerHTML = entries.map(([k, v]) => blBar(k || '(unknown)', v, max, color)).join('');
+}
+function renderBacklinks(d) {
+  const body = document.getElementById('bl-body');
+  const badge = document.getElementById('bl-source-badge');
+  const extras = document.getElementById('bl-extras');
+  if (d.status === 'no_snapshot_yet') {
+    body.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#94a3b8;">No backlink data yet — click Refresh to pull it from the active Data Provider (see Settings).</div>';
+    badge.style.display = 'none';
+    extras.style.display = 'none';
+    return;
+  }
+  if (d.source) {
+    const isDfs = d.source === 'dataforseo';
+    badge.style.display = 'inline-block';
+    badge.style.background = isDfs ? '#eef2ff' : '#fff7ed';
+    badge.style.color = isDfs ? '#4338ca' : '#c2410c';
+    badge.textContent = isDfs ? 'via DataForSEO' : 'via SEMrush';
+  }
+  const stats = [
+    blStat('Authority / Rank', d.authority_score, '#7c3aed'),
+    blStat('Referring Domains', d.referring_domains?.toLocaleString(), '#0284c7'),
+    blStat('Total Backlinks', d.total_backlinks?.toLocaleString(), '#16a34a'),
+    blStat('Follow / Nofollow', (d.follow_links ?? '—') + ' / ' + (d.nofollow_links ?? '—'), '#d97706'),
+  ];
+  if (d.spam_score != null) stats.push(blStat('Spam Score', d.spam_score, spamColor(d.spam_score)));
+  if (d.broken_backlinks != null) stats.push(blStat('Broken Backlinks', d.broken_backlinks, d.broken_backlinks > 0 ? '#dc2626' : '#16a34a'));
+  body.innerHTML = stats.join('');
+  body.style.gridTemplateColumns = `repeat(${stats.length}, 1fr)`;
+  if (d.tld_distribution || d.platform_distribution) {
+    extras.style.display = 'grid';
+    renderDistribution('bl-tld-bars', d.tld_distribution, '#4f46e5');
+    renderDistribution('bl-platform-bars', d.platform_distribution, '#0891b2');
+  } else {
+    extras.style.display = 'none';
+  }
+}
+function loadBacklinks() {
+  fetch('/projects/' + PROJECT_ID + '/backlinks').then(r => r.json()).then(renderBacklinks)
+    .catch(() => { document.getElementById('bl-body').innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#dc2626;">Could not load backlink data.</div>'; });
+}
+// ── Google Search Console ───────────────────────────────
+function selectGscProperty(propertyId) {
+  fetch('/projects/{{ project.id }}/gsc/properties/' + propertyId + '/select', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d) { throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function() { location.reload(); })
+    .catch(function(err) { showToast('Could not select GSC property: ' + err.message, 'error'); });
+}
+function disconnectGsc() {
+  if (!confirm('Disconnect Google Search Console for this project? You can reconnect any time.')) return;
+  fetch('/projects/{{ project.id }}/gsc/disconnect', { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d) { throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function() { location.reload(); })
+    .catch(function(err) { showToast('Could not disconnect GSC: ' + err.message, 'error'); });
+}
+
+function refreshBacklinks() {
+  const btn = document.getElementById('bl-refresh-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  fetch('/projects/' + PROJECT_ID + '/backlinks/refresh', { method: 'POST' })
+    .then(res => res.json().then(d => ({ ok: res.ok, d })))
+    .then(({ ok, d }) => {
+      btn.disabled = false; btn.textContent = 'Refresh now';
+      if (!ok) { showToast('❌ ' + (d.detail || 'Refresh failed'), 'error'); return; }
+      renderBacklinks(d);
+      showToast('✅ Backlinks refreshed', 'success');
+    })
+    .catch(err => { btn.disabled = false; btn.textContent = 'Refresh now'; showToast('❌ ' + err.message, 'error'); });
+}
+let blCurrentTab = 'active';
+function switchBlTab(btn, tab) {
+  document.querySelectorAll('[data-bltab]').forEach(function(b){
+    b.style.background = 'transparent'; b.style.color = '#64748b'; b.style.boxShadow = '';
+  });
+  btn.style.background = '#fff'; btn.style.color = '#4f46e5'; btn.style.boxShadow = '0 1px 3px rgba(0,0,0,.07)';
+  blCurrentTab = tab;
+  loadBacklinkRecords();
+}
+function loadBacklinkRecords() {
+  const body = document.getElementById('bl-records-body');
+  body.innerHTML = 'Loading…';
+  fetch('/projects/' + PROJECT_ID + '/backlinks/records?filter=' + blCurrentTab).then(r => r.json()).then(rows => {
+    const countEl = document.getElementById('bl-records-count');
+    if (countEl) countEl.textContent = rows.length ? rows.length + ' ' + blCurrentTab : '';
+    if (!rows.length) { body.innerHTML = 'No ' + blCurrentTab + ' backlinks' + (blCurrentTab === 'active' ? ' yet -- click Refresh now or enable weekly auto-pull.' : '.'); return; }
+    const hasExtras = rows.some(r => r.domain_rank != null || r.spam_score != null);
+    body.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
+      '<thead><tr style="text-align:left;color:#94a3b8;"><th style="padding:4px 8px;">Source</th><th style="padding:4px 8px;">Anchor</th>' +
+      (hasExtras ? '<th style="padding:4px 8px;">Domain Rank</th><th style="padding:4px 8px;">Spam</th>' : '') +
+      '<th style="padding:4px 8px;">Follow</th></tr></thead><tbody>' +
+      rows.map(r => `<tr style="border-top:1px solid #f1f5f9;">
+        <td style="padding:4px 8px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="${r.source_url}" target="_blank" rel="noopener" style="color:#4f46e5;text-decoration:none;">${r.source_url}</a></td>
+        <td style="padding:4px 8px;color:#64748b;">${r.anchor_text || '—'}</td>` +
+        (hasExtras ? `<td style="padding:4px 8px;color:#374151;">${r.domain_rank ?? '—'}</td>
+        <td style="padding:4px 8px;color:${r.spam_score >= 30 ? '#dc2626' : r.spam_score >= 15 ? '#d97706' : '#374151'};">${r.spam_score ?? '—'}</td>` : '') +
+        `<td style="padding:4px 8px;">${r.is_follow ? '✅' : '🚫'}</td>
+      </tr>`).join('') + '</tbody></table>';
+  }).catch(() => { body.innerHTML = 'Could not load backlink records.'; });
+}
+function saveBacklinkSchedule() {
+  const enabled = document.getElementById('bl-sched-enabled').checked;
+  fetch('/projects/' + PROJECT_ID + '/schedule/backlink_pull', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: enabled, interval: 'weekly', timezone: 'Asia/Kolkata' }),
+  }).then(res => {
+    if (!res.ok) return res.json().then(d => { throw new Error(d.detail || ('HTTP ' + res.status)); });
+    showToast('✅ Backlink schedule saved', 'success');
+  }).catch(err => showToast('❌ ' + err.message, 'error'));
+}
+loadBacklinks();
+loadBacklinkRecords();
+
+function saveWordPressConnection() {
+  var siteUrl = document.getElementById('wp-site-url').value.trim();
+  var token = document.getElementById('wp-api-token').value.trim();
+  var result = document.getElementById('wp-save-result');
+  if (!siteUrl) { result.style.color = '#dc2626'; result.textContent = 'Site URL is required.'; return; }
+  if (!token) { result.style.color = '#dc2626'; result.textContent = 'API Token is required to save.'; return; }
+  fetch('/projects/' + PROJECT_ID + '/wordpress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ site_url: siteUrl, api_token: token, is_staging: true }),
+  }).then(function(res) {
+    if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+    result.style.color = '#16a34a';
+    result.textContent = '✅ Connection saved. Click Test connection to verify.';
+    document.getElementById('wp-api-token').value = '';
+    showToast('WordPress connection saved.');
+  }).catch(function(err) {
+    result.style.color = '#dc2626';
+    result.textContent = '❌ ' + err.message;
+  });
+}
+function testWordPressConnection() {
+  var result = document.getElementById('wp-test-result');
+  result.style.color = '#64748b';
+  result.textContent = 'Testing…';
+
+  // The backend's own ping call is capped at 20s (wordpress.py's _TIMEOUT),
+  // so a healthy round-trip always resolves well under that. This client-
+  // side timeout exists for everything OUTSIDE that -- a wedged server
+  // process, a stalled network connection that never cleanly errors, a
+  // dead proxy -- so "Testing…" can never sit there indefinitely with no
+  // way out except reloading the page. 25s gives the backend's 20s cap a
+  // little headroom before this fires.
+  var controller = new AbortController();
+  var timedOut = false;
+  var timer = setTimeout(function() { timedOut = true; controller.abort(); }, 25000);
+
+  fetch('/projects/' + PROJECT_ID + '/wordpress/test', { method: 'POST', signal: controller.signal })
+    .then(function(res) { return res.json().then(function(d){ return { ok: res.ok, body: d }; }); })
+    .then(function(r) {
+      clearTimeout(timer);
+      if (r.ok) {
+        result.style.color = '#16a34a';
+        result.textContent = '✅ Connected — ' + (r.body.site && r.body.site.plugin ? r.body.site.plugin + ' v' + r.body.site.version : 'plugin responded');
+        // A plugin older than the latest release (or a differently-named plugin)
+        // misses fixes -- say so instead of leaving the site silently behind.
+        var upd = r.body.plugin_update;
+        if (upd && upd.update_available === true) {
+          result.style.color = '#b45309';
+          result.textContent += upd.reason === 'different_plugin'
+            ? ' — ⚠ this is not AI SEO Connector; install v' + upd.latest_version + ' (download button above)'
+            : ' — ⚠ update available: v' + upd.latest_version;
+        }
+        showToast('Connection verified.');
+      } else {
+        result.style.color = '#dc2626';
+        result.textContent = '❌ ' + (r.body.detail || 'Connection test failed');
+      }
+    })
+    .catch(function(err) {
+      clearTimeout(timer);
+      result.style.color = '#dc2626';
+      result.textContent = timedOut
+        ? '❌ Timed out waiting for a response (25s). The site may be slow, unreachable, or the plugin isn\'t installed at this URL yet.'
+        : '❌ ' + err.message;
+    });
+}
+
+// ── Fix on Page modal (identical flow to the single-page-project prototype) ──
+var ISSUES_JS = {{ issues_js | tojson }};
+var DEPLOYABLE_CATEGORIES = {{ deployable_categories | tojson }};
+var fmCurrentIssueId = null;
+// Which per-image "Fix Now" panels are expanded, keyed by index into the
+// current issue's missing_alt_images -- renderFixModal() runs on every
+// suggestion decide/generate/save, so this has to live outside that
+// function or the panel a user just opened would collapse on its own action.
+var fmExpandedImages = {};
+
+var FILTER_LABELS = { all: 'All issues', needs: 'Needs fixing (scored errors + warnings)', error: 'Critical errors only', warning: 'Warnings only', opportunity: 'Opportunities (not scored)', suggestions: 'Pages with AI suggestions' };
+function filterIssues(kind, opts) {
+  var section = document.getElementById('issues-section');
+  if (!section) return;
+  if (!(opts && opts.noScroll)) section.scrollIntoView({ behavior: 'smooth' });
+
+  var rows = section.querySelectorAll('tr[data-issue-row]');
+  if (!rows.length) return; // empty-state page has no table to filter
+
+  // Toolbar state: the active tab (kind) plus the free-text search box (q).
+  window.ISSUE_KIND = kind;
+  var q = (window.ISSUE_Q || '').trim().toLowerCase();
+  var filtering = kind !== 'all' || q !== '';
+
+  var detailsCounts = new Map();
+  rows.forEach(function(row) {
+    var matchesKind = kind === 'all'
+      || (kind === 'needs' && (row.dataset.severity === 'error' || row.dataset.severity === 'warning'))
+      || (kind === 'error' && row.dataset.severity === 'error')
+      || (kind === 'warning' && row.dataset.severity === 'warning')
+      || (kind === 'opportunity' && row.dataset.severity === 'opportunity')
+      || (kind === 'suggestions' && row.dataset.hasSugg === '1');
+    var show = matchesKind && (q === '' || row.textContent.toLowerCase().indexOf(q) !== -1);
+    row.style.display = show ? '' : 'none';
+    var details = row.closest('details');
+    if (details) {
+      detailsCounts.set(details, (detailsCounts.get(details) || 0) + (show ? 1 : 0));
+    }
+  });
+  detailsCounts.forEach(function(count, details) {
+    details.style.display = (!filtering || count > 0) ? '' : 'none';
+    if (filtering) details.open = count > 0;
+  });
+  // "Clean" categories (no rows at all, e.g. zero H1 issues) aren't in
+  // detailsCounts since they never had a data-issue-row -- hide those too
+  // when a specific filter is active, since a clean category can never
+  // contain the errors/warnings/suggestions being filtered for.
+  section.querySelectorAll('details.ig').forEach(function(details) {
+    if (!detailsCounts.has(details)) {
+      details.style.display = !filtering ? '' : 'none';
+    }
+  });
+  if (window.syncToolbar) syncToolbar(kind);
+
+  var banner = document.getElementById('issues-filter-banner');
+  var label = document.getElementById('issues-filter-label');
+  if (banner && label) {
+    if (kind === 'all') { banner.style.display = 'none'; }
+    else { label.textContent = FILTER_LABELS[kind] || kind; banner.style.display = 'flex'; }
+  }
+}
+
+function fmEsc(s) {
+  return (s == null ? '' : String(s)).replace(/[&<>"']/g, function(c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+var FM_STATUS_COLORS = {
+  accepted: 'background:#dcfce7;color:#15803d;', rejected: 'background:#fee2e2;color:#dc2626;',
+  edited: 'background:#dbeafe;color:#1d4ed8;', deployed: 'background:#f3e8ff;color:#7e22ce;',
+  pending: 'background:#f1f5f9;color:#64748b;',
+};
+function fmStatusBadge(status) {
+  return '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;' + (FM_STATUS_COLORS[status] || FM_STATUS_COLORS.pending) + '">' + status + '</span>';
+}
+
+function openFixModal(issueId) {
+  var issue = ISSUES_JS[issueId];
+  if (!issue) return;
+  fmCurrentIssueId = issueId;
+  fmExpandedImages = {};
+  document.getElementById('fix-modal-message').textContent = issue.message || '';
+  var urlEl = document.getElementById('fix-modal-url');
+  urlEl.textContent = issue.url || '';
+  urlEl.href = issue.url || '#';
+  document.getElementById('fd-title').textContent = fdTitleFor(issue);
+  fmMaybeBackfillImages(issue);
+  renderFixModal(issue);
+  fmUpdateNav();
+  document.getElementById('fix-modal-backdrop').classList.add('open');
+  var drawer = document.getElementById('fix-modal');
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+}
+function closeFixModal() {
+  document.getElementById('fix-modal-backdrop').classList.remove('open');
+  var drawer = document.getElementById('fix-modal');
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  fmCurrentIssueId = null;
+}
+
+// 'deployed' only means WordPress accepted the write; this badge shows whether
+// the live page actually reflects it. Missing live_status is treated as 'checking'.
+function fmLiveBadge(s) {
+  var st = s.live_status || 'checking';
+  var map = {
+    checking: ['background:#f1f5f9;color:#64748b;', '⏳ Checking live page…'],
+    live: ['background:#dcfce7;color:#15803d;', '✓ Live on site'],
+    not_showing: ['background:#fef3c7;color:#b45309;', '⚠ Saved, not showing on site yet'],
+    unverified: ['background:#fee2e2;color:#dc2626;', "⚠ Couldn't verify"]
+  };
+  var m = map[st] || map.checking;
+  if (st === 'not_showing' && s.live_rechecking) {
+    m = ['background:#fef3c7;color:#b45309;', '⏳ Not showing yet — re-checking automatically'];
+  }
+  var html = '<span title="' + fmEsc(s.live_detail) + '" style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;' + m[0] + '">' + m[1] + '</span>';
+  var revId = parseInt(s.live_revision_id, 10);
+  if (st !== 'live' && !isNaN(revId)) {
+    html += '<button onclick="fmReverify(' + revId + ',' + s.id + ')" style="font-size:10px;color:#4f46e5;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">Re-check</button>';
+  }
+  return html;
+}
+// Polls the revisions list until this revision's live check has finished, then
+// updates the card. Without this the badge would sit on "Checking…" forever,
+// because the verify job runs in the background and nothing else refreshes it.
+var FM_VERIFY_TO_LIVE = { verified: 'live', mismatch: 'not_showing', error: 'unverified' };
+function fmWatchRevision(revisionId, suggId, attempt) {
+  attempt = attempt || 0;
+  if (attempt >= 24) return;  // ~2 minutes at 5s, then leave the badge on Checking (Re-check still works)
+  setTimeout(function() {
+    fetch('/projects/' + PROJECT_ID + '/revisions')
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(list) {
+        var rev = (list || []).find(function(x) { return x.id === revisionId; });
+        var live = rev && FM_VERIFY_TO_LIVE[rev.verify_status];
+        if (!live) return fmWatchRevision(revisionId, suggId, attempt + 1);
+        var issue = ISSUES_JS[fmCurrentIssueId];
+        var s = issue && (issue.suggestions || []).find(function(x) { return x.id === suggId; });
+        if (s) {
+          s.live_status = live; s.live_detail = rev.verify_detail; s.live_revision_id = revisionId;
+          renderFixModal(issue);
+        }
+        showToast(live === 'live' ? 'Verified: the change is live on the site.' : 'Saved, but the live page does not show it yet.', live === 'live' ? undefined : 'error');
+      })
+      .catch(function() { fmWatchRevision(revisionId, suggId, attempt + 1); });
+  }, 5000);
+}
+function fmReverify(revisionId, suggId) {
+  fetch('/revisions/' + revisionId + '/verify', { method: 'POST' })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      var issue = ISSUES_JS[fmCurrentIssueId];
+      var s = issue && (issue.suggestions || []).find(function(x) { return x.id === suggId; });
+      if (s) { s.live_status = 'checking'; renderFixModal(issue); }
+      showToast('Re-checking the live page…');
+      fmWatchRevision(revisionId, suggId);
+    })
+    .catch(function(err) { showToast('Re-check failed: ' + err.message, 'error'); });
+}
+
+function fmSuggestionCard(issue, s) {
+  var canDeploy = ['accepted', 'edited'].indexOf(s.status) !== -1 && DEPLOYABLE_CATEGORIES.indexOf(issue.category) !== -1;
+  var text = s.edited_content || s.content;
+  var actions;
+  if (s.status === 'deployed') {
+    actions = fmLiveBadge(s) + '<button onclick="fmRollback(' + s.id + ')" style="font-size:11px;color:#ea580c;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">↩ Roll back</button>';
+  } else if (s.status === 'accepted' || s.status === 'edited') {
+    // Already decided -- Accept/Reject/Use-in-editor no longer apply. Save
+    // (loads it into the editor below so further tweaks can be saved) and
+    // Deploy (when this category has a real WordPress write path) are the
+    // only actions left.
+    actions = '<button onclick="fmUseSuggestion(' + s.id + ')" style="font-size:11px;color:#4f46e5;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">Save</button>'
+      + (canDeploy ? '<button onclick="fmDeploy(' + s.id + ', this)" style="font-size:11px;color:#7e22ce;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">🚀 Deploy</button>' : '');
+  } else {
+    actions = '<button onclick="fmUseSuggestion(' + s.id + ')" style="font-size:11px;color:#4f46e5;font-weight:600;background:none;border:none;cursor:pointer;padding:0;">Edit</button>'
+      + '<button onclick="fmDecide(' + s.id + ',\'accept\')" style="font-size:11px;font-weight:700;color:#6d28d9;background:#f1eaff;border:none;border-radius:6px;cursor:pointer;padding:3px 9px;">Use suggestion</button>'
+      + '<button onclick="fmDecide(' + s.id + ',\'reject\')" style="font-size:11px;color:#64748b;background:none;border:none;cursor:pointer;padding:0;">Skip</button>';
+  }
+  return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px;margin-bottom:6px;">' +
+    '<div style="font-size:12px;color:#0f172a;word-break:break-word;margin-bottom:5px;">' + fmEsc(text) + '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+    fmStatusBadge(s.status) +
+    '<span style="font-size:10px;color:#94a3b8;">via ' + fmEsc(s.source) + '</span>' +
+    actions + '</div></div>';
+}
+
+// Backfills issue.missing_alt_images for an image_alt issue that has none
+// yet -- called from openFixModal, before the first render, so the very
+// first paint already shows "Reading this page's images…" instead of
+// flashing the old "Could not read this page's images" message for a page
+// that was simply never fetched (crawled before this per-image detail
+// existed, see routes/onpage_semrush.py's /image-alts/refresh docstring).
+// Runs at most once per issue per page load (_imageFetchDone guards it) --
+// a failed fetch is shown with its real reason, not silently retried on
+// every re-render (toggle/generate/save all call renderFixModal).
+function fmMaybeBackfillImages(issue) {
+  if (issue.category !== 'image_alt') return;
+  if ((issue.missing_alt_images || []).length > 0) return;
+  if (issue._imageFetchLoading || issue._imageFetchDone) return;
+  issue._imageFetchLoading = true;
+  fetch('/projects/' + issue.project_id + '/onpage/pages/' + issue.page_id + '/image-alts/refresh', { method: 'POST' })
+    .then(function(res) { return res.json().then(function(d) { return { ok: res.ok, body: d }; }); })
+    .then(function(r) {
+      issue._imageFetchLoading = false;
+      issue._imageFetchDone = true;
+      if (r.ok) {
+        issue.missing_alt_images = r.body.images || [];
+      } else {
+        issue._imageFetchError = r.body.detail || 'Unknown error.';
+      }
+      if (fmCurrentIssueId === issue.id) renderFixModal(issue);
+    })
+    .catch(function(err) {
+      issue._imageFetchLoading = false;
+      issue._imageFetchDone = true;
+      issue._imageFetchError = err.message;
+      if (fmCurrentIssueId === issue.id) renderFixModal(issue);
+    });
+}
+
+function fmImageListHtml(issue) {
+  // Only image_alt issues carry this (see onpage_semrush.py's
+  // _missing_alt_images) -- null for every other category.
+  var images = issue.missing_alt_images;
+  if (!images) return '';
+  if (!images.length) {
+    // Three different reasons the list can be empty -- see
+    // fmMaybeBackfillImages, which sets _imageFetchLoading/_imageFetchError.
+    // Telling these apart is the whole point of this backfill: before it
+    // existed, "never fetched" (a page crawled before this per-image detail
+    // shipped) and "fetched, failed" both silently looked exactly like
+    // "fetched fine, nothing missing".
+    if (issue._imageFetchLoading) {
+      return '<div style="font-size:11px;color:#94a3b8;margin-bottom:12px;">Reading this page\'s images…</div>';
+    }
+    if (issue._imageFetchError) {
+      return '<div style="font-size:11px;color:#dc2626;margin-bottom:12px;">Could not read this page\'s images: ' + fmEsc(issue._imageFetchError) + '</div>';
+    }
+    return '<div style="font-size:11px;color:#94a3b8;margin-bottom:12px;">This page\'s HTML had no images without alt text -- the count above is DataForSEO\'s own check, and may be flagging an image loaded by JavaScript, which a plain HTML fetch can\'t see.</div>';
+  }
+  return '<div style="margin-bottom:14px;">' +
+    '<label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px;">' + images.length + ' image(s) missing alt text</label>' +
+    '<div id="fm-img-scroll" style="max-height:420px;overflow-y:auto;border:1px solid #f1f5f9;border-radius:6px;">' +
+    images.map(function(img, i) {
+      // Placeholder markup is identical for "no src at all" and "src set but
+      // failed to load" (onerror below just swaps the <img> for this same
+      // sibling div) -- one visual language for "nothing to show here"
+      // either way, rather than two different broken-looking states.
+      // Bumped from a 44px cropped square to a bigger box with object-fit:
+      // contain (not cover) -- contain shows the WHOLE image letterboxed
+      // inside the box instead of cropping it to fill a square, since the
+      // point here is "let the SEO team actually see what this image is",
+      // not a tidy uniform grid.
+      // Stacked layout (image on top, full row width, description below)
+      // instead of a side-by-side thumbnail -- a fixed-height row box caps
+      // how big the image can render even with object-fit:contain; putting
+      // it on its own line lets it use the full modal width so large
+      // images are actually readable instead of squeezed into a corner.
+      var placeholder = '<div style="width:100%;height:260px;border-radius:6px;background:#f1f5f9;color:#94a3b8;font-size:11px;display:flex;align-items:center;justify-content:center;text-align:center;">No image</div>';
+      var srcEsc = img.src ? fmEsc(img.src) : '';
+      var thumb = srcEsc
+        ? '<img src="' + srcEsc + '" loading="lazy" ' +
+          'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" ' +
+          'style="width:100%;max-height:260px;object-fit:contain;border-radius:6px;background:#f1f5f9;">' +
+          '<div style="display:none;width:100%;height:260px;border-radius:6px;background:#f1f5f9;color:#94a3b8;font-size:11px;align-items:center;justify-content:center;text-align:center;">No image</div>'
+        : placeholder;
+      // SPIKE: also_on (see onpage_semrush.py's _missing_alt_images) -- list
+      // of other page URLs where this same image src is also missing alt
+      // text, so a non-SEO user knows one CMS/media-library fix covers all
+      // of them instead of editing page by page. Collapsed behind <details>
+      // by default -- a template image can repeat across 90+ pages, and the
+      // raw URL list is noise for the actual decision (fix this one image);
+      // the count alone conveys "fix once, applies everywhere", the list is
+      // only for someone who wants to double-check which pages. Revert with
+      // the backend bit if this doesn't hold up under real data.
+      var alsoOn = img.also_on || [];
+      var alsoOnHtml = alsoOn.length
+        ? '<details style="margin-top:4px;">' +
+          '<summary style="font-size:10px;color:#b45309;cursor:pointer;">Also missing alt on ' + alsoOn.length + ' other page(s)</summary>' +
+          '<div style="margin-top:4px;max-height:120px;overflow-y:auto;">' +
+          alsoOn.map(function(u) { return '<div style="font-size:10px;word-break:break-all;color:#92400e;padding:2px 0;">' + fmEsc(u) + '</div>'; }).join('') +
+          '</div></details>'
+        : '';
+      return '<div style="padding:10px;border-bottom:1px solid #f8fafc;">' +
+        thumb +
+        '<div style="min-width:0;margin-top:8px;">' +
+          '<div style="font-size:11px;color:#374151;word-break:break-all;">' + fmEsc(img.src || '(no src)') + '</div>' +
+          '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Current ALT: Missing' +
+            (img.media_id ? ' &middot; WP media #' + img.media_id : ' &middot; no WordPress media_id found (theme/logo image)') +
+          '</div>' +
+          alsoOnHtml +
+        '</div>' +
+        fmImageFixPanelHtml(issue, img, i) +
+      '</div>';
+    }).join('') +
+    '</div></div>';
+}
+
+// Per-image "Fix Now" panel -- lets the user pick EITHER their own typed alt
+// text OR an AI-generated one for this ONE image, scoped by image_src
+// (migration 027 / prompt_builder.build_suggestion_context's image param) so
+// a page with several missing-alt images never mixes up which suggestion is
+// for which image, unlike the old page-wide generate button.
+function fmImageFixPanelHtml(issue, img, idx) {
+  var expanded = !!fmExpandedImages[idx];
+  var suggs = (issue.suggestions || []).filter(function(s) { return s.image_src === img.src; });
+  var suggHtml = suggs.map(function(s) { return fmSuggestionCard(issue, s); }).join('')
+    || '<div style="font-size:10px;color:#94a3b8;padding:4px 0;">No AI suggestions generated for this image yet.</div>';
+  return '<div style="margin-top:8px;">' +
+    '<button onclick="fmToggleImageFix(' + idx + ')" style="font-size:11px;font-weight:700;padding:6px 10px;border-radius:6px;border:1px solid #c7d2fe;background:' + (expanded ? '#eef2ff' : '#fff') + ';color:#4f46e5;cursor:pointer;">' +
+      (expanded ? '▾' : '▸') + ' Fix Now' +
+    '</button>' +
+    (expanded ?
+      '<div style="margin-top:8px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #f1f5f9;">' +
+        '<div id="fm-img-sugg-' + idx + '">' + suggHtml + '</div>' +
+        '<input id="fm-img-guidance-' + idx + '" type="text" maxlength="200" placeholder="Optional: a preference for the AI, e.g. \'keep it short\' (Image Alt hardening Part 5 -- cannot override accuracy rules)" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;font-family:inherit;margin-top:4px;margin-bottom:6px;">' +
+        '<button id="fm-img-gen-btn-' + idx + '" onclick="fmGenerateForImage(' + idx + ')" style="width:100%;font-size:11px;font-weight:700;padding:7px 10px;border-radius:7px;border:none;background:#4f46e5;color:#fff;cursor:pointer;">' +
+          (suggs.length ? '↻ Regenerate' : '✦ Generate AI Suggestion (sees the actual image)') +
+        '</button>' +
+        '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;">' +
+          '<label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:5px;">Or write your own alt text</label>' +
+          '<textarea id="fm-img-manual-' + idx + '" rows="2" placeholder="Describe this image for screen readers…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;"></textarea>' +
+          '<button id="fm-img-save-btn-' + idx + '" onclick="fmSaveManualForImage(' + idx + ')" style="margin-top:8px;font-size:11px;font-weight:700;padding:7px 14px;border-radius:7px;border:none;background:#0f172a;color:#fff;cursor:pointer;">Save</button>' +
+        '</div>' +
+      '</div>'
+      : '') +
+  '</div>';
+}
+
+function fmToggleImageFix(idx) {
+  fmExpandedImages[idx] = !fmExpandedImages[idx];
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (issue) renderFixModal(issue);
+}
+
+async function fmGenerateForImage(idx) {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (!issue) return;
+  var img = (issue.missing_alt_images || [])[idx];
+  if (!img) return;
+  var guidanceEl = document.getElementById('fm-img-guidance-' + idx);
+  var guidance = guidanceEl ? guidanceEl.value.trim() : '';
+  var listEl = document.getElementById('fm-img-sugg-' + idx);
+  var btn = document.getElementById('fm-img-gen-btn-' + idx);
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  if (listEl) {
+    listEl.innerHTML = '<div style="text-align:center;padding:12px 0;">' +
+      '<div style="font-size:20px;animation:spin 1s linear infinite;display:inline-block;">⚙️</div>' +
+      '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Analyzing the image…</div></div>';
+  }
+  try {
+    var url = '/api/suggest?project_id=' + issue.project_id + '&page_id=' + issue.page_id + '&issue_id=' + issue.id + '&image_src=' + encodeURIComponent(img.src || '')
+      + (guidance ? '&user_guidance=' + encodeURIComponent(guidance) : '');
+    var resp = await fetch(url, { method: 'POST' });
+    if (!resp.ok) { var d = await resp.json().catch(function(){return {};}); throw new Error(d.detail || ('HTTP ' + resp.status)); }
+    var data = await resp.json();
+    // Replace only THIS image's suggestions in the issue's flat list -- the
+    // server already scoped generation to image_src, this just keeps the
+    // client-side cache (ISSUES_JS) in sync without touching other images'.
+    issue.suggestions = (issue.suggestions || []).filter(function(s) { return s.image_src !== img.src; }).concat(data.suggestions || []);
+    fmExpandedImages[idx] = true;
+    renderFixModal(issue);
+    showToast('Suggestions generated.');
+  } catch (err) {
+    if (listEl) listEl.innerHTML = '<div style="font-size:10px;color:#dc2626;padding:4px 0;">Failed to generate: ' + fmEsc(err.message) + '</div>';
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate AI Suggestion'; }
+  }
+}
+
+async function fmSaveManualForImage(idx) {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (!issue) return;
+  var img = (issue.missing_alt_images || [])[idx];
+  var ta = document.getElementById('fm-img-manual-' + idx);
+  var saveBtn = document.getElementById('fm-img-save-btn-' + idx);
+  if (!img || !ta) return;
+  var value = ta.value.trim();
+  if (!value) { showToast('Alt text cannot be empty.', 'error'); return; }
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+  try {
+    var resp = await fetch('/api/suggestions/manual?project_id=' + issue.project_id + '&page_id=' + issue.page_id + '&issue_id=' + issue.id + '&image_src=' + encodeURIComponent(img.src || ''),
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: value }) });
+    if (!resp.ok) { var d = await resp.json().catch(function(){return {};}); throw new Error(d.detail || ('HTTP ' + resp.status)); }
+    var s = await resp.json();
+    issue.suggestions = issue.suggestions || [];
+    var existingIdx = issue.suggestions.findIndex(function(x){ return x.id === s.id; });
+    if (existingIdx === -1) issue.suggestions.push(s); else issue.suggestions[existingIdx] = s;
+    fmExpandedImages[idx] = true;
+    renderFixModal(issue);
+    showToast('Alt text saved.');
+  } catch (err) {
+    showToast('Could not save: ' + err.message, 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+  }
+}
+
+function renderFixModal(issue) {
+  var body = document.getElementById('fix-modal-body');
+  // Every image_alt issue is fixed entirely through fmImageListHtml's
+  // per-image "Fix Now" panels -- the old single shared generate/textarea
+  // block below would generate ambiguous "alt text for one of several
+  // images, unclear which" suggestions (see the gap this whole feature was
+  // built to close). That holds even while images are still loading or the
+  // fetch failed (fmImageListHtml shows those states itself, see
+  // fmMaybeBackfillImages) -- never fall back to the generic per-page flow
+  // for this category, only for every non-image_alt one.
+  var isImageAlt = issue.category === 'image_alt';
+
+  // The images list is its own scrollable box, fully torn down and rebuilt
+  // on every re-render (toggle/generate/save/decide all end up here) -- a
+  // plain innerHTML swap resets its scrollTop to 0, so a click on a
+  // below-the-fold image's "Fix Now" visually snapped the list back to the
+  // top instead of staying put. Save/restore across the swap fixes it.
+  var prevScrollEl = document.getElementById('fm-img-scroll');
+  var prevScrollTop = prevScrollEl ? prevScrollEl.scrollTop : 0;
+
+  var genericHtml = '';
+  // The first pending suggestion is featured in the right-hand AI panel
+  // (fmRightHtml); every other suggestion stays in the list below it, with
+  // the same accept/edit/deploy/rollback actions as before.
+  var hero = isImageAlt ? null : fmHero(issue);
+  // Paused findings (issue.ai_paused, see app/issue_copy.py) get no generate
+  // button, suggestion list or editor -- fmRightHtml shows the reason instead.
+  if (!isImageAlt && !issue.ai_paused) {
+    var others = (issue.suggestions || []).filter(function(s) { return s !== hero; });
+    var suggHtml = others.map(function(s) { return fmSuggestionCard(issue, s); }).join('')
+      || (hero ? '' : '<div style="text-align:center;padding:14px 0;color:#94a3b8;font-size:11px;">No suggestions yet for this issue.</div>');
+    genericHtml =
+      (others.length ? '<div style="font-size:11px;font-weight:700;color:#64748b;margin:4px 0 6px;">Other suggestions</div>' : '') +
+      '<div id="fm-sugg-list">' + suggHtml + '</div>' +
+      '<button id="fm-generate-btn" onclick="fmGenerate()" style="width:100%;font-size:11px;font-weight:700;padding:7px 10px;border-radius:7px;border:none;background:#4f46e5;color:#fff;cursor:pointer;margin-top:4px;">' +
+      ((issue.suggestions || []).length ? '↻ Regenerate' : '✦ Generate AI Suggestion') + '</button>' +
+      '<div style="margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;">' +
+      '<label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:5px;">Edit &amp; save</label>' +
+      '<textarea id="fm-textarea" rows="3" placeholder="Click \'Use in editor\' on a suggestion above, or type your own fix here…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;"></textarea>' +
+      '<button id="fm-save-btn" onclick="fmSave()" style="margin-top:8px;font-size:11px;font-weight:700;padding:7px 14px;border-radius:7px;border:none;background:#0f172a;color:#fff;cursor:pointer;">Save</button>' +
+      '</div>';
+  }
+
+  body.innerHTML = isImageAlt
+    ? fmLeftHtml(issue, null) + fmImageListHtml(issue) + genericHtml
+    : '<div class="fd-grid"><div>' + fmLeftHtml(issue, hero) + fmImageListHtml(issue) + '</div><div>' + fmRightHtml(issue, hero) + genericHtml + '</div></div>';
+
+  var newScrollEl = document.getElementById('fm-img-scroll');
+  if (newScrollEl) newScrollEl.scrollTop = prevScrollTop;
+}
+
+async function fmGenerate() {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (!issue) return;
+  var listEl = document.getElementById('fm-sugg-list');
+  var btn = document.getElementById('fm-generate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  listEl.innerHTML = '<div style="text-align:center;padding:16px 0;">' +
+    '<div style="font-size:22px;animation:spin 1s linear infinite;display:inline-block;">⚙️</div>' +
+    '<div style="font-size:10px;color:#94a3b8;margin-top:8px;">Generating suggestions…</div></div>';
+  try {
+    var resp = await fetch('/api/suggest?project_id=' + issue.project_id + '&page_id=' + issue.page_id + '&issue_id=' + issue.id, { method: 'POST' });
+    if (!resp.ok) { var d = await resp.json().catch(function(){return {};}); throw new Error(d.detail || ('HTTP ' + resp.status)); }
+    var data = await resp.json();
+    issue.suggestions = data.suggestions || [];
+    renderFixModal(issue);
+    showToast('Suggestions generated.');
+  } catch (err) {
+    listEl.innerHTML = '<div style="text-align:center;padding:12px 0;">' +
+      '<div style="font-size:10px;color:#dc2626;margin-bottom:6px;">Failed to generate: ' + fmEsc(err.message) + '</div></div>';
+    if (btn) { btn.disabled = false; btn.textContent = (issue.suggestions || []).length ? '↻ Regenerate' : '✦ Generate AI Suggestion'; }
+  }
+}
+
+function fmUseSuggestion(suggId) {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (!issue) return;
+  var s = (issue.suggestions || []).find(function(x){ return x.id === suggId; });
+  if (!s) return;
+  // Per-image suggestions (image_src set) load into that image's own
+  // "write your own" textarea instead of the shared #fm-textarea, which
+  // only exists for issues without per-image detail (see renderFixModal).
+  var taId = 'fm-textarea';
+  if (s.image_src) {
+    var imgIdx = (issue.missing_alt_images || []).findIndex(function(img){ return img.src === s.image_src; });
+    if (imgIdx !== -1) taId = 'fm-img-manual-' + imgIdx;
+  }
+  var ta = document.getElementById(taId);
+  if (ta) {
+    ta.value = s.edited_content || s.content;
+    ta.dataset.suggId = s.id;
+    ta.dataset.suggOriginal = ta.value;
+  }
+}
+
+async function fmSave() {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  var ta = document.getElementById('fm-textarea');
+  var saveBtn = document.getElementById('fm-save-btn');
+  if (!issue || !ta) { return; }
+  var value = ta.value.trim();
+  if (!value) { showToast('Suggestion text cannot be empty.', 'error'); return; }
+  saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+  try {
+    var resp;
+    var isNew = !ta.dataset.suggId;
+    if (isNew) {
+      // No suggestion picked via "Use in editor" -- the user typed their own
+      // fix from scratch, so create a brand-new (manual) suggestion row
+      // instead of erroring out and forcing them through AI generation first.
+      resp = await fetch('/api/suggestions/manual?project_id=' + issue.project_id + '&page_id=' + issue.page_id + '&issue_id=' + issue.id,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: value }) });
+    } else {
+      var id = parseInt(ta.dataset.suggId, 10);
+      var changed = value !== ta.dataset.suggOriginal;
+      resp = changed
+        ? await fetch('/suggestions/' + id + '/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: value }) })
+        : await fetch('/suggestions/' + id + '/accept', { method: 'POST' });
+    }
+    if (!resp.ok) { var d = await resp.json().catch(function(){return {};}); throw new Error(d.detail || ('HTTP ' + resp.status)); }
+    var s = await resp.json();
+    if (isNew) {
+      issue.suggestions = issue.suggestions || [];
+      var idx = issue.suggestions.findIndex(function(x){ return x.id === s.id; });
+      if (idx === -1) issue.suggestions.push(s); else issue.suggestions[idx] = s;
+    } else {
+      fmMergeSuggestion(issue, s);
+    }
+    renderFixModal(issue);
+    showToast(isNew ? 'Suggestion saved.' : (value !== ta.dataset.suggOriginal ? 'Suggestion edited and saved.' : 'Suggestion accepted.'));
+  } catch (err) {
+    showToast('Could not save: ' + err.message, 'error');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+  }
+}
+
+function fmMergeSuggestion(issue, s) {
+  var idx = (issue.suggestions || []).findIndex(function(x){ return x.id === s.id; });
+  if (idx === -1) return;
+  issue.suggestions[idx] = Object.assign({}, issue.suggestions[idx], s);
+}
+
+function fmDecide(id, action) {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  fetch('/suggestions/' + id + '/' + action, { method: 'POST' })
+    .then(function(res) { if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); }); return res.json(); })
+    .then(function(s) {
+      if (issue) {
+        fmMergeSuggestion(issue, s);
+        renderFixModal(issue);
+        // Accepting a suggestion loads it straight into the editor below --
+        // no need for a separate "Use in editor" click on what's now the
+        // decided suggestion.
+        if (action === 'accept') fmUseSuggestion(id);
+      }
+      showToast('Suggestion ' + action + 'ed.');
+    })
+    .catch(function(err) { showToast('Could not ' + action + ': ' + err.message, 'error'); });
+}
+
+// Deploy tries with no post_id first -- the server auto-resolves it from
+// the page's crawl-time (or live-resolved) WordPress lookup. Only if that
+// fails (HTTP 400, e.g. never resolved) do we fall back to asking the user
+// for the numeric ID; a 422 (e.g. homepage is a post-archive) shows the
+// real reason instead.
+function fmDeploy(id, btn) {
+  if (btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.dataset.origText = btn.textContent;
+    btn.textContent = 'Deploying…';
+  }
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  function attempt(body) {
+    return fetch('/suggestions/' + id + '/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }
+  attempt({}).then(function(res) {
+    if (res.status === 400) {
+      return res.json().then(function(d) {
+        var postId = prompt((d.detail || "Couldn't auto-detect the WordPress post ID.") + '\n\nThis will be saved for future deploys. Enter it manually (numeric):');
+        if (!postId || !postId.trim() || isNaN(parseInt(postId, 10))) { throw new Error('Deploy cancelled.'); }
+        return attempt({ wp_post_id: parseInt(postId, 10) });
+      });
+    }
+    if (res.status === 422) {
+      return res.json().then(function(d) {
+        var msg = (d.detail && d.detail.message) || 'This suggestion cannot be deployed automatically.';
+        throw new Error(msg);
+      });
+    }
+    return res;
+  })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      // The deploy response is the new SuggestionRevision, so its id lets the
+      // 'Re-check' button work straight away (no reload needed).
+      return res.json().then(function(rev) {
+        if (issue) {
+          var s = (issue.suggestions || []).find(function(x){ return x.id === id; });
+          if (s) { s.status = 'deployed'; s.live_status = 'checking'; s.live_revision_id = (rev && rev.id) || null; }
+          renderFixModal(issue);
+        }
+        showToast('Saved to WordPress. Checking the live page…');
+        if (rev && rev.id) fmWatchRevision(rev.id, id);
+      });
+    })
+    .catch(function(err) {
+      showToast('Deploy failed: ' + err.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || '🚀 Deploy'; }
+    });
+}
+
+function fmRollback(suggId) {
+  var issue = ISSUES_JS[fmCurrentIssueId];
+  if (!issue) return;
+  fetch('/projects/' + issue.project_id + '/revisions')
+    .then(function(res) { return res.json(); })
+    .then(function(revisions) {
+      var match = revisions.find(function(r){ return r.suggestion_id === suggId && !r.rolled_back_at; });
+      if (!match) throw new Error('No active deployment found for this suggestion.');
+      return fetch('/revisions/' + match.id + '/rollback', { method: 'POST' });
+    })
+    .then(function(res) {
+      if (!res.ok) return res.json().then(function(d){ throw new Error(d.detail || ('HTTP ' + res.status)); });
+      var s = (issue.suggestions || []).find(function(x){ return x.id === suggId; });
+      if (s) s.status = 'accepted';
+      renderFixModal(issue);
+      showToast('Rolled back.');
+    })
+    .catch(function(err) { showToast('Rollback failed: ' + err.message, 'error'); });
+}
+function openRefreshModal() {
+  document.getElementById('refresh-modal-backdrop').style.display = 'block';
+  document.getElementById('refresh-modal').style.display = 'block';
+  updateRefreshCostEstimate();
+}
+function closeRefreshModal() {
+  document.getElementById('refresh-modal-backdrop').style.display = 'none';
+  document.getElementById('refresh-modal').style.display = 'none';
+}
+function updateRefreshCostEstimate() {
+  var input = document.getElementById('refresh-max-pages-input');
+  var n = Math.max(1, Math.min(parseInt(input.value, 10) || 1, parseInt(input.max, 10) || 1000));
+  document.getElementById('refresh-cost-estimate').textContent = 'Estimated cost: ~$' + (n * 0.00015).toFixed(3);
+}
+function saveDefaultMaxPages(btn) {
+  var input = document.getElementById('refresh-max-pages-input');
+  var n = Math.max(1, Math.min(parseInt(input.value, 10) || 100, parseInt(input.max, 10) || 1000));
+  btn.disabled = true;
+  fetch('/projects/' + PROJECT_ID + '/onpage/site-audit/max-pages', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'max_crawl_pages=' + n,
+  })
+    .then(function(r) { if (!r.ok) throw new Error('Save failed'); return r.json(); })
+    .then(function() {
+      showToast('Saved ' + n + ' as default max pages for this project.');
+      document.getElementById('refresh-max-pages-field').value = n;
+    })
+    .catch(function(err) { showToast(err.message, 'error'); })
+    .finally(function() { btn.disabled = false; });
+}
+function submitRefreshForm(btn) {
+  // Clamp is re-applied here (not just server-side) so what the user
+  // confirmed in the modal is exactly what gets submitted -- the server
+  // clamp in start_site_audit is still the real guard, this just keeps
+  // the displayed estimate and the submitted value in sync.
+  var input = document.getElementById('refresh-max-pages-input');
+  var n = Math.max(1, Math.min(parseInt(input.value, 10) || 100, parseInt(input.max, 10) || 1000));
+  document.getElementById('refresh-max-pages-field').value = n;
+  // Guards the exact incident this whole cooldown feature exists for: a
+  // double/triple click here used to fire one billed DataForSEO crawl per
+  // click, since a plain form submit has no built-in re-entrancy guard and
+  // the page doesn't navigate away instantly. The server-side check in
+  // start_site_audit is the real protection (covers two tabs, a stale
+  // reload, etc.) -- this just stops the common case at the source.
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  document.getElementById('refresh-form').submit();
+}
+</script>
+{% endblock %}

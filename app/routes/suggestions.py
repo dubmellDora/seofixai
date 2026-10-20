@@ -1,0 +1,405 @@
+import hashlib
+import logging
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, object_session
+
+from .. import ai_provider, deploy_status, issue_copy, models, prompt_builder
+from ..ai_errors import AIGenerationError, AIProviderError, ImageFetchError
+from ..database import get_db
+from ..services import content_optimizer, context_builder, failure_log
+
+router = APIRouter()
+logger = logging.getLogger("image_alt")
+provider_logger = logging.getLogger("suggestions")
+
+# Statuses that represent a real user decision. Regeneration must never
+# delete these -- they're the learning dataset (V6). Only undecided/refused
+# rows may be replaced by a fresh generation.
+DECIDED_STATUSES = ("accepted", "edited", "deployed")
+
+
+def _normalize_content(text: str) -> str:
+    """trim + collapse whitespace + casefold -- the same "is this actually
+    the same suggestion" comparison used for de-duplication everywhere in
+    this module, so two suggestions that only differ by capitalization or
+    stray spacing count as duplicates."""
+    return " ".join((text or "").split()).casefold()
+
+
+def content_hash(text: str) -> str:
+    return hashlib.sha256(_normalize_content(text).encode("utf-8")).hexdigest()
+
+
+def _provider_message(exc: Exception) -> str:
+    """A user-safe reason for a provider failure. Names the problem (for example
+    a missing setting or Anthropic's own "credit balance is too low"); never
+    includes a secret -- the exceptions we see carry messages, not keys."""
+    if isinstance(exc, KeyError) and exc.args and isinstance(exc.args[0], str) and exc.args[0].isupper():
+        return f"the AI provider is not configured on this server (missing setting {exc.args[0]})"
+    return f"{type(exc).__name__}: {str(exc)[:200]}"
+
+
+def _call_provider(db: Session, context: dict, issue: models.Issue, image_src: str | None) -> list[str]:
+    """The provider half of generation: returns the suggestion texts. Raises the
+    provider's own exception on failure; the caller turns anything that is not
+    an ImageFetchError/AIGenerationError into an AIProviderError."""
+    if issue.category == "image_alt":
+        # Image Alt AI hardening pass: real vision input + structured JSON,
+        # not the text-only numbered-list path every other category still
+        # uses -- see ai_provider.generate_image_alt_suggestions. Errors are
+        # NOT swallowed into an empty suggestion list -- Part 1 requires the
+        # "couldn't actually see the image" case to surface, not silently
+        # degrade to a filename-only guess, so both failure modes propagate
+        # as real exceptions for the route to turn into an HTTP error.
+        try:
+            items = ai_provider.generate_image_alt_suggestions(db, context, image_src)
+        except ImageFetchError:
+            logger.warning("image_alt: could not fetch image for visual analysis: %r", image_src)
+            raise
+        except AIGenerationError:
+            logger.warning("image_alt: provider returned unparseable suggestions for image %r", image_src)
+            raise
+        # reason/confidence are logged for now rather than persisted --
+        # Suggestion has no columns for them and Part 7 says not to add
+        # columns unless absolutely necessary; the UI doesn't need them to
+        # render the existing accept/reject/edit flow, only the content text.
+        for item in items:
+            logger.info(
+                "image_alt suggestion (image=%r, confidence=%.2f): %s -- %s",
+                image_src, item.get("confidence", 0.0), item["alt_text"], item.get("reason", ""),
+            )
+        return [item["alt_text"] for item in items]
+    return ai_provider.generate_suggestions(db, context)
+
+
+def _generate_and_store(
+    db: Session, project_id: int, page_id: int, issue_id: int,
+    image_src: str | None = None, user_guidance: str | None = None,
+) -> list[models.Suggestion]:
+    page = db.get(models.Page, page_id)
+    issue = db.get(models.Issue, issue_id)
+    if not page or not issue:
+        raise HTTPException(status_code=404)
+    if models.is_optimizer_rule(issue.rule):
+        # Generating here would delete the optimizer's undecided suggestions for this
+        # issue and replace them with generic ones written without its evidence.
+        raise HTTPException(status_code=409, detail="These suggestions are managed by the AI Content Optimizer. Regenerate them from the optimizer, not from here.")
+    paused = issue_copy.ai_paused_reason(issue.category, issue.rule)
+    if paused:
+        # Server-side so no client (or stale tab) can trigger generation.
+        raise HTTPException(status_code=409, detail=paused)
+
+    # Fetch/create the page's understanding (cached per crawl snapshot) before
+    # generating, so the prompt gets the distilled JSON instead of raw fit_markdown.
+    # None for pages with no crawl snapshot (DataForSEO/SEMrush-sourced) --
+    # generation still works, just without that extra context. For image_alt
+    # specifically, prompt_builder.build_suggestion_context also pulls
+    # page_title/page_meta_description straight off models.Page regardless of
+    # this -- see that function's docstring (Image Alt hardening Part 4).
+    understanding_row = context_builder.build_page_understanding(db, page)
+
+    profile = (
+        db.query(models.BusinessProfile)
+        .filter(models.BusinessProfile.project_id == page.project_id)
+        .first()
+    )
+    context = prompt_builder.build_suggestion_context(
+        page, issue, business_profile=profile,
+        understanding=understanding_row.understanding_json if understanding_row else None,
+        image={"src": image_src} if image_src else None,
+        user_guidance=user_guidance,
+    )
+
+    # Suggestions are scoped by (issue_id, image_src) so a multi-image
+    # image_alt issue keeps each image's suggestions independent -- an
+    # image_alt issue with no image_src (single-image or pre-migration-027
+    # rows) still behaves exactly as before, scoped to the whole issue.
+    scope_filter = [models.Suggestion.issue_id == issue_id, models.Suggestion.image_src == image_src]
+
+    # A decided suggestion already represents whatever text it holds -- if
+    # the model regenerates the same wording again, that's not a NEW option,
+    # it's the same one the user already ruled on. Compare against the
+    # user-facing value (edited_content if they edited it, else content).
+    decided_hashes = {
+        content_hash(s.edited_content or s.content)
+        for s in db.query(models.Suggestion).filter(
+            *scope_filter,
+            models.Suggestion.status.in_(DECIDED_STATUSES),
+        )
+    }
+
+    try:
+        texts = _call_provider(db, context, issue, image_src)
+    except (ImageFetchError, AIGenerationError):
+        raise   # already specific and handled by the routes below
+    except Exception as exc:
+        # Missing/invalid key, no credits, rate limit, outage ... Previously this
+        # escaped as a bare HTTP 500 with nothing logged and nothing shown.
+        failure_log.crash(
+            provider_logger, "suggestions.provider_failed",
+            project=project_id, issue=issue_id, category=issue.category, error=type(exc).__name__,
+        )
+        raise AIProviderError(_provider_message(exc)) from exc
+
+    # Only now that the provider produced something usable do we replace the
+    # undecided suggestions -- accepted/edited/deployed ones are recorded user
+    # decisions and must survive regeneration. Doing this BEFORE the provider
+    # call meant a failed generation silently destroyed the existing pending
+    # suggestions. An empty answer keeps them too.
+    if texts:
+        db.query(models.Suggestion).filter(
+            *scope_filter,
+            models.Suggestion.status.notin_(DECIDED_STATUSES),
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    rows = []
+    seen_hashes = set(decided_hashes)  # also guards against dupes *within* this same batch
+    rank = 0
+    for text in texts:
+        h = content_hash(text)
+        if h in seen_hashes:
+            continue
+        seen_hashes.add(h)
+        rank += 1
+        row = models.Suggestion(
+            project_id=project_id,
+            page_id=page_id,
+            issue_id=issue_id,
+            image_src=image_src,
+            understanding_id=understanding_row.id if understanding_row else None,
+            content=text,
+            content_hash=h,
+            rank=rank,
+        )
+        db.add(row)
+        rows.append(row)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Belt-and-braces: the checks above should already prevent this, but
+        # a genuine race (two rapid Generate clicks committing between our
+        # SELECT and our INSERT) could still hit the DB's unique constraint.
+        # Recover by inserting whatever DID survive, one row at a time,
+        # instead of losing the whole batch to one collision.
+        db.rollback()
+        survivors = []
+        for row in rows:
+            db.add(row)
+            try:
+                db.commit()
+                survivors.append(row)
+            except IntegrityError:
+                db.rollback()
+        rows = survivors
+
+    for row in rows:
+        db.refresh(row)
+    return rows
+
+
+def _suggestion_out(s: models.Suggestion) -> dict:
+    live = {}
+    if s.status == "deployed":
+        # Only deployed rows need the extra query; every other status is unchanged.
+        live = deploy_status.suggestion_live_fields(
+            deploy_status.live_status_for_suggestions(object_session(s), [s.id]), s
+        )
+    # Same code-computed checks the On-Page page load attaches, so a suggestion
+    # generated or edited in the open modal shows its checks immediately instead
+    # of a badge with nothing behind it.
+    db = object_session(s)
+    issue = db.get(models.Issue, s.issue_id) if db else None
+    page = db.get(models.Page, s.page_id) if db else None
+    checks = issue_copy.check_suggestion(issue.category, s.edited_content or s.content, page) if issue else []
+    return {
+        **live,
+        "checks": checks,
+        "checks_summary": issue_copy.checks_summary(checks),
+        "id": s.id,
+        "status": s.status,
+        "image_src": s.image_src,
+        "content": s.content,
+        "edited_content": s.edited_content,
+        # Hardcoded -- Suggestion has no source column, so this doesn't
+        # reflect which provider (Claude/Gemini) actually generated a given
+        # row, only ever shows "claude". Fine while Claude is the only
+        # provider in practice; needs a real column once Gemini suggestions
+        # start getting generated, so old and new rows stay honestly labeled.
+        "source": "claude",
+        "rank": s.rank,
+        "accepted_at": s.accepted_at,
+        "deployed_at": s.deployed_at,
+    }
+
+
+@router.post("/projects/{project_id}/pages/{page_id}/issues/{issue_id}/suggest")
+def generate(project_id: int, page_id: int, issue_id: int, db: Session = Depends(get_db)):
+    try:
+        _generate_and_store(db, project_id, page_id, issue_id)
+    except AIProviderError as e:
+        raise HTTPException(status_code=502, detail=f"AI provider error: {e}")
+    return RedirectResponse(url=f"/projects/{project_id}/pages/{page_id}", status_code=303)
+
+
+class SuggestionEditIn(BaseModel):
+    content: str
+
+
+@router.post("/api/suggestions/manual")
+def create_manual_suggestion(
+    project_id: int,
+    page_id: int,
+    issue_id: int,
+    payload: SuggestionEditIn,
+    image_src: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Lets the user type a fix straight into the editor without generating
+    an AI suggestion first -- the fix-modal's textarea previously required
+    picking 'Use in editor' on an existing row, so a user who already knew
+    the fix had no way to save it. Stored as status 'edited' (no separate
+    'manual' status exists) with edited_content == content, since that's
+    the same shape edit_suggestion() produces and it dedupes/displays the
+    same way. image_src scopes this to one image within a multi-image
+    image_alt issue (migration 027) -- the same "type your own alt text"
+    path the AI-generate option sits next to in the fix modal."""
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="content is required")
+    h = content_hash(content)
+
+    existing = db.query(models.Suggestion).filter(
+        models.Suggestion.issue_id == issue_id,
+        models.Suggestion.image_src == image_src,
+        models.Suggestion.content_hash == h,
+    ).first()
+    if existing:
+        if existing.status == "deployed":
+            raise HTTPException(status_code=409, detail="Already deployed -- roll it back before changing its status.")
+        existing.status = "edited"
+        existing.edited_content = content
+        existing.accepted_at = datetime.now(timezone.utc)
+        db.commit()
+        return _suggestion_out(existing)
+
+    max_rank = db.query(models.Suggestion).filter(models.Suggestion.issue_id == issue_id).count()
+    row = models.Suggestion(
+        project_id=project_id,
+        page_id=page_id,
+        issue_id=issue_id,
+        image_src=image_src,
+        content=content,
+        content_hash=h,
+        rank=max_rank + 1,
+        status="edited",
+        edited_content=content,
+        accepted_at=datetime.now(timezone.utc),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _suggestion_out(row)
+
+
+@router.post("/api/suggest")
+def generate_json(
+    project_id: int,
+    page_id: int,
+    issue_id: int,
+    image_src: str | None = None,
+    user_guidance: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Generate AI suggestions (count set by prompt_builder.SUGGESTION_COUNT) and return as JSON for the inline optimize panel, including each row's id/status so the UI can act on a specific suggestion afterward. image_src scopes generation to one image within a multi-image image_alt issue (migration 027) -- omitted for every other category. user_guidance is an optional free-text preference (image_alt only, Image Alt hardening Part 5) -- ignored by every other category's prompt."""
+    try:
+        rows = _generate_and_store(db, project_id, page_id, issue_id, image_src=image_src, user_guidance=user_guidance)
+    except ImageFetchError as e:
+        # 422: the request was well-formed but the image genuinely couldn't
+        # be visually analyzed (unreachable, wrong content-type, too large) --
+        # a controlled, visible failure per Part 1, not a silent text-only
+        # fallback pretending visual analysis happened.
+        raise HTTPException(status_code=422, detail=f"Couldn't load this image for AI analysis: {e}")
+    except AIGenerationError as e:
+        # 502: our request was fine, the upstream provider's response wasn't
+        # usable even after one retry.
+        raise HTTPException(status_code=502, detail=f"AI provider returned an unusable response: {e}")
+    except AIProviderError as e:
+        # 502: the provider could not be used at all (key, credits, rate limit,
+        # outage). The message names the failure so the user sees why, not "HTTP 500".
+        raise HTTPException(status_code=502, detail=f"AI provider error: {e}")
+    return {"suggestions": [_suggestion_out(r) for r in rows]}
+
+
+# ── Acceptance tracking (V6 / Task 3.1) ─────────────────────────────────
+
+
+def _get_suggestion(db: Session, suggestion_id: int) -> models.Suggestion:
+    suggestion = db.get(models.Suggestion, suggestion_id)
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    return suggestion
+
+
+@router.post("/suggestions/{suggestion_id}/accept")
+def accept_suggestion(suggestion_id: int, db: Session = Depends(get_db)):
+    suggestion = _get_suggestion(db, suggestion_id)
+    if suggestion.status == "deployed":
+        raise HTTPException(status_code=409, detail="Already deployed -- roll it back before changing its status.")
+    # AI Content Optimizer suggestions carry a validation result; one the checks blocked
+    # cannot be approved as written. (None for every other suggestion: unchanged.)
+    blocked = content_optimizer.blocking_reasons(db, suggestion.id)
+    if blocked:
+        content_optimizer.log_refusal("accept", suggestion.id, blocked)
+        raise HTTPException(status_code=409, detail="Blocked by validation, so it cannot be approved as written: " + "; ".join(blocked))
+    suggestion.status = "accepted"
+    suggestion.accepted_at = datetime.now(timezone.utc)
+    db.commit()
+    return _suggestion_out(suggestion)
+
+
+@router.post("/suggestions/{suggestion_id}/reject")
+def reject_suggestion(suggestion_id: int, db: Session = Depends(get_db)):
+    suggestion = _get_suggestion(db, suggestion_id)
+    if suggestion.status == "deployed":
+        raise HTTPException(status_code=409, detail="Already deployed -- roll it back before changing its status.")
+    suggestion.status = "rejected"
+    suggestion.accepted_at = None
+    db.commit()
+    return _suggestion_out(suggestion)
+
+
+@router.post("/suggestions/{suggestion_id}/edit")
+def edit_suggestion(suggestion_id: int, payload: SuggestionEditIn, db: Session = Depends(get_db)):
+    """Stores the user's modified version alongside the original -- the
+    original content is never overwritten, since 'what the AI proposed vs.
+    what the human changed it to' is exactly the signal the future learning
+    dataset needs."""
+    suggestion = _get_suggestion(db, suggestion_id)
+    if suggestion.status == "deployed":
+        raise HTTPException(status_code=409, detail="Already deployed -- roll it back before changing its status.")
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="content is required")
+    # An edit is an approval ('edited' is deployable), so an optimizer suggestion's NEW
+    # text is held to the same checks as the AI's draft BEFORE anything is saved. None
+    # for every other suggestion: unchanged.
+    validation = content_optimizer.revalidate(db, suggestion, content)
+    if validation is not None:
+        blocked = content_optimizer.validation_blockers(validation)
+        if blocked:
+            content_optimizer.log_refusal("edit", suggestion.id, blocked)
+            raise HTTPException(status_code=422, detail="Your edit is blocked by validation, so it was not saved: " + "; ".join(blocked))
+    suggestion.status = "edited"
+    suggestion.edited_content = content
+    suggestion.accepted_at = datetime.now(timezone.utc)
+    if validation is not None:
+        content_optimizer.apply_validation(db, suggestion.id, validation)   # the card now shows the checks for the text that would deploy
+    db.commit()
+    return _suggestion_out(suggestion)

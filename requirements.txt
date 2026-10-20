@@ -1,0 +1,21 @@
+fastapi
+anthropic>=1,<2
+google-genai
+python-dotenv
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+httpx
+beautifulsoup4
+lxml
+jinja2
+python-multipart
+crawl4ai>=0.9,<0.10
+playwright  # Required by crawl4ai for browser automation; run `playwright install chromium` after installing
+pytest  # Test suite: python -m pytest tests/
+apscheduler  # Background job scheduler -- runs the crawl/rank_check/keyword_refresh loop
+cryptography  # Fernet encryption for WordPress API tokens at rest (WP_TOKEN_KEY in .env)
+# Requires Python 3.10-3.12 - crawl4ai pins lxml~=5.3, which has no prebuilt wheel for 3.14+ yet
+google-auth
+google-auth-oauthlib
+google-api-python-client

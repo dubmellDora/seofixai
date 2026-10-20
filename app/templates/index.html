@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Projects — SeoFixAI{% endblock %}
+
+{% block topbar %}
+<div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+  <span style="font-size:14px;font-weight:700;color:#0f172a;">Projects</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <a href="/settings" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:12px;font-weight:600;text-decoration:none;transition:background .12s;"
+       onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      API Keys
+    </a>
+    <button onclick="openNewProject()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 15px;border-radius:7px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(79,70,229,.25);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" d="M12 4v16M4 12h16"/></svg>
+      New Project
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .proj-card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:20px 24px; display:flex; align-items:center; gap:24px; transition:box-shadow .15s ease, border-color .15s ease; position:relative; text-decoration:none; color:inherit; }
+  .proj-card:hover { box-shadow:0 10px 28px rgba(15,23,42,.08); border-color:#e0e7ff; }
+  .proj-del { opacity:0; transition:opacity .15s; }
+  .proj-card:hover .proj-del { opacity:1; }
+  .provider-pill { display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; width:fit-content; }
+  .proj-list { display:flex; flex-direction:column; gap:12px; }
+  .health-ring { flex-shrink:0; }
+  .stat-block { min-width:64px; }
+  @media (max-width: 860px) {
+    .proj-card { flex-wrap:wrap; }
+    .proj-stats { width:100%; justify-content:space-between; border-top:1px solid #f1f5f9; padding-top:14px; margin-top:4px; }
+  }
+  @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+
+  #np-backdrop { display:none; position:fixed; inset:0; background:rgba(15,23,42,.35); backdrop-filter:blur(2px); z-index:500; align-items:center; justify-content:center; }
+  #np-backdrop.open { display:flex; }
+  #np-modal { background:#fff; border-radius:16px; width:min(460px,92vw); box-shadow:0 30px 70px rgba(0,0,0,.25); overflow:hidden; }
+  .provider-choice { flex:1; border:1.5px solid #e2e8f0; border-radius:10px; padding:14px 12px; cursor:pointer; text-align:center; transition:border-color .12s, background .12s; }
+  .provider-choice:hover { background:#f8fafc; }
+  .provider-choice.selected { border-color:#4f46e5; background:#eef2ff; }
+  .np-input { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; color:#0f172a; font-size:13px; outline:none; transition:border-color .12s; }
+  .np-input:focus { border-color:#6366f1; }
+</style>
+
+<div style="padding:32px 24px 40px;max-width:1280px;margin:0 auto;">
+
+  <div style="margin-bottom:24px;">
+    <div style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.01em;margin-bottom:4px;">📁 Your projects</div>
+    <div style="font-size:13px;color:#94a3b8;">Every project is powered by one on-page data provider — DataForSEO or SEMrush — chosen when it's created.</div>
+  </div>
+
+  {% if projects %}
+  <div class="proj-list">
+    {% for project in projects %}
+    {% set card = project_cards.get(project.id) %}
+    {% set provider = card.provider %}
+    {% set health = card.health %}
+    {% set hcolor = '#16a34a' if health is not none and health >= 80 else ('#d97706' if health is not none and health >= 50 else '#dc2626') %}
+
+    <a href="/projects/{{ project.id }}" class="proj-card">
+
+      <!-- Health ring (SEMrush-style circular score), or a spinner while data is being fetched -->
+      <div class="health-ring" style="position:relative;width:56px;height:56px;">
+        {% if card.is_fetching %}
+        <div class="fetch-spinner" style="width:56px;height:56px;border-radius:50%;border:6px solid #eef2ff;border-top-color:#4f46e5;animation:spin 1s linear infinite;"></div>
+        {% elif health is not none %}
+        <svg width="56" height="56" viewBox="0 0 56 56" style="transform:rotate(-90deg);">
+          <circle cx="28" cy="28" r="24" fill="none" stroke="#f1f5f9" stroke-width="6"/>
+          <circle cx="28" cy="28" r="24" fill="none" stroke="{{ hcolor }}" stroke-width="6" stroke-linecap="round"
+                  stroke-dasharray="{{ (health / 100 * 150.8)|round(1) }} 150.8"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:{{ hcolor }};">{{ health }}</div>
+        {% else %}
+        <div style="width:56px;height:56px;border-radius:50%;border:6px solid #f1f5f9;display:flex;align-items:center;justify-content:center;font-size:10px;color:#cbd5e1;font-weight:700;">—</div>
+        {% endif %}
+      </div>
+
+      <!-- Name + provider -->
+      <div style="min-width:0;flex-shrink:0;width:220px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+          <img src="https://www.google.com/s2/favicons?sz=32&domain={{ project.base_url }}" width="16" height="16"
+               style="border-radius:3px;flex-shrink:0;" onerror="this.style.display='none'">
+          <div style="font-size:14px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ project.name }}</div>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;">{{ project.base_url }}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          {% if provider %}
+          <span class="provider-pill" style="background:{{ provider.bg }};color:{{ provider.color }};">{{ provider.initials }} {{ provider.label }}</span>
+          {% endif %}
+          {% if card.is_fetching %}
+          <span class="provider-pill" style="background:#eef2ff;color:#4f46e5;">⏳ Fetching…</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Stat strip (mimics SEMrush Site Audit widget: crawled / errors / warnings) -->
+      <div class="proj-stats" style="display:flex;align-items:center;gap:28px;flex:1;">
+        <div class="stat-block">
+          <div style="font-size:17px;font-weight:800;color:#0f172a;">{{ card.total_pages }}</div>
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">🕷️ Crawled Pages</div>
+        </div>
+        <div class="stat-block">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#dc2626;flex-shrink:0;"></span>
+            <span style="font-size:17px;font-weight:800;color:{% if card.error_count > 0 %}#dc2626{% else %}#0f172a{% endif %};">{{ card.error_count }}</span>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">🚫 Errors</div>
+        </div>
+        <div class="stat-block">
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0;"></span>
+            <span style="font-size:17px;font-weight:800;color:{% if card.warning_count > 0 %}#b45309{% else %}#0f172a{% endif %};">{{ card.warning_count }}</span>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">⚠️ Warnings</div>
+        </div>
+        <div class="stat-block">
+          <div style="font-size:12px;font-weight:600;color:#64748b;">{{ card.last_checked.strftime('%b %d, %Y') if card.last_checked else 'Never' }}</div>
+          <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">🕒 Last Checked</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <form method="post" action="/projects/{{ project.id }}/delete" class="proj-del" onclick="event.stopPropagation()"
+              onsubmit="return confirm('Delete {{ project.name }}? This cannot be undone.')">
+          <button type="submit" title="Delete project"
+            style="width:28px;height:28px;border-radius:6px;border:1px solid #fee2e2;background:#fff;color:#dc2626;cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;">×</button>
+        </form>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="m9 6 6 6-6 6"/></svg>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div style="padding:72px 24px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:16px;">
+    <div style="width:52px;height:52px;border-radius:14px;background:#eef2ff;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="1.5" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"/></svg>
+    </div>
+    <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:6px;">No projects yet</div>
+    <div style="font-size:13px;color:#94a3b8;margin-bottom:20px;">Create your first project to start auditing on-page SEO.</div>
+    <button onclick="openNewProject()"
+      style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(79,70,229,.25);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><path stroke-linecap="round" d="M12 4v16M4 12h16"/></svg>
+      New Project
+    </button>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- New Project modal -->
+<div id="np-backdrop" onclick="if(event.target===this)closeNewProject()">
+  <div id="np-modal">
+    <div style="padding:22px 24px 4px;">
+      <div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:2px;">New Project</div>
+      <div style="font-size:12px;color:#94a3b8;">Every project needs a data provider — this decides which API powers its on-page audit.</div>
+    </div>
+    <form method="post" action="/projects" style="padding:18px 24px 24px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">Project name</label>
+        <input class="np-input" name="name" required placeholder="e.g. My Company Site" autofocus>
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">Website URL</label>
+        <input class="np-input" name="base_url" required placeholder="https://example.com">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:7px;">Data provider</label>
+        <div style="display:flex;gap:8px;">
+          <label class="provider-choice selected" id="choice-dataforseo">
+            <input type="radio" name="project_type" value="dataforseo" checked style="display:none;" onchange="selectProvider('dataforseo')">
+            <div style="font-size:13px;font-weight:700;color:#0891b2;margin-bottom:2px;">DataForSEO</div>
+            <div style="font-size:10px;color:#94a3b8;">~$0.00015/page · verified working</div>
+          </label>
+          <label class="provider-choice" id="choice-semrush">
+            <input type="radio" name="project_type" value="semrush" style="display:none;" onchange="selectProvider('semrush')">
+            <div style="font-size:13px;font-weight:700;color:#c2410c;margin-bottom:2px;">SEMrush</div>
+            <div style="font-size:10px;color:#94a3b8;">Site Audit API</div>
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding-top:4px;">
+        <button type="submit" style="flex:1;padding:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#6d28d9);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Create Project</button>
+        <button type="button" onclick="closeNewProject()" style="padding:10px 16px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openNewProject() {
+  document.getElementById('np-backdrop').classList.add('open');
+  document.querySelector('#np-modal input[name="name"]').focus();
+}
+function closeNewProject() {
+  document.getElementById('np-backdrop').classList.remove('open');
+}
+function selectProvider(value) {
+  document.querySelectorAll('.provider-choice').forEach(function(el) { el.classList.remove('selected'); });
+  document.getElementById('choice-' + value).classList.add('selected');
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeNewProject();
+});
+
+// Deliberately no auto-reload here (previously setTimeout(reload, 8000)
+// while any project had a crawl/audit in progress). That looked like a
+// one-shot timer but wasn't: since is_fetching is computed fresh on every
+// server render, each reload just re-entered this same script and
+// scheduled another one -- an unbounded reload loop with no way to stop if
+// the underlying Job/OnPageTask ever got stuck (see scheduler.py's
+// reconcile_stale_jobs/reconcile_stale_onpage_tasks, which now guarantee
+// that stuck state clears within a few hours on its own). The spinner is
+// now a static "still fetching" indicator; revisiting or manually
+// refreshing this page shows whatever the latest state is, same as any
+// normal page.
+</script>
+{% endblock %}

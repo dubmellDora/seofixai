@@ -1,0 +1,281 @@
+"""
+Chooses between Semrush and DataForSEO for a given keyword operation and
+returns whichever provider answered, already normalized (schemas.NormalizedKeyword).
+Nothing above this module should know or care which provider was used.
+
+ASSUMPTION FLAG: the routing priorities below (Bulk Analysis -> Semrush first,
+Suggestions/Questions -> DataForSEO first) are based on typical per-call
+pricing for each report type, not measured cost/quota numbers from this
+deployment's actual Semrush/DataForSEO accounts. Revisit once real usage/billing data is
+available -- treat these as a starting default, not a permanent design.
+"""
+import time
+from datetime import datetime, timezone
+
+from . import dataforseo, semrush
+from .keyword_locations import DEFAULT_LOCATION
+from .schemas import NormalizedKeyword
+
+_SEMRUSH_COOLDOWN_UNTIL = 0.0
+_SEMRUSH_COOLDOWN_SECONDS = 300
+
+TREND_MIN_GAP_DAYS = 7
+TREND_THRESHOLD_PCT = 0.10
+
+
+def _semrush_available() -> bool:
+    return time.monotonic() >= _SEMRUSH_COOLDOWN_UNTIL
+
+
+def _mark_semrush_cooldown() -> None:
+    global _SEMRUSH_COOLDOWN_UNTIL
+    _SEMRUSH_COOLDOWN_UNTIL = time.monotonic() + _SEMRUSH_COOLDOWN_SECONDS
+
+
+def _no_data(keyword: str) -> NormalizedKeyword:
+    """Both providers answered but neither has metrics for this keyword."""
+    return NormalizedKeyword(
+        keyword=keyword, source="none", fetched_at=datetime.now(timezone.utc), status="no_data"
+    )
+
+
+def _failed(keyword: str, errors: list[str]) -> NormalizedKeyword:
+    """Every provider that was tried failed outright -- distinct from no_data
+    so the UI can say 'lookup failed' instead of rendering a blank row."""
+    return NormalizedKeyword(
+        keyword=keyword,
+        source="none",
+        fetched_at=datetime.now(timezone.utc),
+        status="error",
+        error="; ".join(errors) or "all providers failed",
+    )
+
+
+def get_keyword_overview(keyword: str, location: str = DEFAULT_LOCATION) -> NormalizedKeyword:
+    """Single-keyword lookup (used when tracking a keyword). Semrush first,
+    DataForSEO on error, no-data, or while Semrush is in a rate-limit cooldown.
+    Always returns a NormalizedKeyword; check .status before persisting."""
+    errors: list[str] = []
+    semrush_answered_no_data = False
+
+    if _semrush_available():
+        row = semrush.fetch_keyword_overview(keyword, location)
+        if row.get("rate_limited"):
+            _mark_semrush_cooldown()
+            errors.append(f"semrush: {row.get('error') or 'rate limited'}")
+        elif row.get("error"):
+            errors.append(f"semrush: {row['error']}")
+        elif not row.get("no_data"):
+            return semrush.normalize_keyword_row(row, keyword)
+        else:
+            # Semrush no_data still falls through -- DataForSEO may have it.
+            semrush_answered_no_data = True
+
+    row = dataforseo.fetch_keyword_overview(keyword, location)
+    if row.get("error"):
+        if semrush_answered_no_data:
+            # Semrush DID answer (just has nothing for this keyword+location);
+            # a broken fallback provider shouldn't turn that into "lookup
+            # failed" -- the honest state is no_data.
+            return _no_data(keyword)
+        errors.append(f"dataforseo: {row['error']}")
+        return _failed(keyword, errors)
+    if row.get("no_data"):
+        return _no_data(keyword)
+    return dataforseo.normalize_keyword_row(row, keyword)
+
+
+def get_keywords_bulk(keywords: list[str], location: str = DEFAULT_LOCATION) -> list[NormalizedKeyword]:
+    """
+    Bulk Analysis (<=100 keywords). ASSUMPTION (see module docstring): Semrush
+    is tried first for all keywords; only keywords it fails to return get a
+    DataForSEO fallback call, rather than re-querying the whole list. Every
+    input keyword gets a result row back -- non-ok ones carry status
+    no_data/error instead of being silently dropped.
+    """
+    results: dict[str, NormalizedKeyword] = {}
+    semrush_answered_no_data: set[str] = set()
+
+    if _semrush_available():
+        rows = semrush.fetch_keywords_bulk(keywords, location)
+        for kw, row in rows.items():
+            if row.get("rate_limited"):
+                _mark_semrush_cooldown()
+            elif not row.get("error") and not row.get("no_data"):
+                results[kw] = semrush.normalize_keyword_row(row, kw)
+            elif row.get("no_data"):
+                semrush_answered_no_data.add(kw)
+
+    missing = [kw for kw in keywords if kw not in results]
+    if missing:
+        rows = dataforseo.fetch_keywords_bulk(missing, location)
+        for kw, row in rows.items():
+            if row.get("error"):
+                # Same rule as get_keyword_overview: a keyword Semrush already
+                # answered no_data for stays no_data even if the fallback fails.
+                if kw in semrush_answered_no_data:
+                    results[kw] = _no_data(kw)
+                else:
+                    results[kw] = _failed(kw, [f"dataforseo: {row['error']}"])
+            elif row.get("no_data"):
+                results[kw] = _no_data(kw)
+            else:
+                results[kw] = dataforseo.normalize_keyword_row(row, kw)
+
+    return [results[kw] for kw in keywords if kw in results]
+
+
+# Suggestion-mode filters. A broad match is a "preposition" keyword when it
+# glues the seed to a context word, a "comparison" when the searcher is
+# weighing options -- both signal clearer intent than a plain related term.
+_PREPOSITION_WORDS = {"for", "with", "without", "near", "to", "in", "on", "at", "under", "before", "after"}
+_COMPARISON_WORDS = {"vs", "versus", "or", "best", "top", "alternative", "alternatives", "cheapest", "review", "reviews"}
+
+SUGGESTION_MODES = ("related", "questions", "prepositions", "comparisons")
+
+
+def _match_mode(keyword: str, words: set[str]) -> bool:
+    return bool(set(keyword.lower().split()) & words)
+
+
+def get_suggestion_groups(
+    seed: str, location: str = DEFAULT_LOCATION, modes: tuple[str, ...] = SUGGESTION_MODES
+) -> dict[str, list[NormalizedKeyword]]:
+    """
+    Suggestions tab: seed keyword in, grouped ideas out. related/questions use
+    DataForSEO-first with Semrush fallback (see module docstring assumption);
+    prepositions/comparisons filter Semrush's broad-match pool. A keyword only
+    appears in the first group that claims it.
+    """
+    groups: dict[str, list[NormalizedKeyword]] = {}
+    seen: set[str] = set()
+
+    def _add(mode: str, rows: list[NormalizedKeyword]) -> None:
+        fresh = [r for r in rows if r.keyword not in seen]
+        seen.update(r.keyword for r in fresh)
+        groups[mode] = fresh
+
+    if "related" in modes:
+        rows = dataforseo.fetch_related_keywords(seed, location)
+        if rows:
+            _add("related", [dataforseo.normalize_keyword_row(r, r.get("keyword", seed)) for r in rows])
+        else:
+            rows = semrush.fetch_related_keywords(seed, location)
+            _add("related", [semrush.normalize_keyword_row(r, r.get("Ph", seed)) for r in rows])
+
+    if "questions" in modes:
+        rows = dataforseo.fetch_keyword_questions(seed, location)
+        if rows:
+            _add("questions", [dataforseo.normalize_keyword_row(r, r.get("keyword", seed)) for r in rows])
+        else:
+            rows = semrush.fetch_keyword_questions(seed, location)
+            _add("questions", [semrush.normalize_keyword_row(r, r.get("Ph", seed)) for r in rows])
+
+    if "prepositions" in modes or "comparisons" in modes:
+        pool = [
+            semrush.normalize_keyword_row(r, r.get("Ph", seed))
+            for r in semrush.fetch_broad_matches(seed, location)
+        ]
+        if "prepositions" in modes:
+            _add("prepositions", [r for r in pool if _match_mode(r.keyword, _PREPOSITION_WORDS)])
+        if "comparisons" in modes:
+            _add("comparisons", [r for r in pool if _match_mode(r.keyword, _COMPARISON_WORDS)])
+
+    return groups
+
+
+def get_serp(keyword: str, location: str = DEFAULT_LOCATION, device: str = "desktop") -> dict:
+    """'View SERP'. DataForSEO first (full titles/descriptions, ~100 results);
+    Semrush's phrase_organic as fallback (domain+URL only, 10 results) so a
+    dead DataForSEO account degrades the SERP view instead of breaking it.
+    Tags the result with _source so callers that care about result depth
+    (e.g. rank_check) know which provider actually answered."""
+    # device is only passed through when it is NOT the default, so the call every
+    # existing caller (and test) makes is byte-for-byte the one it always made.
+    # Semrush's phrase_organic has no device option: its fallback answers for
+    # desktop regardless, which is reported via "_device" so callers can say so.
+    if device == "desktop":
+        result = dataforseo.fetch_serp(keyword, location)
+    else:
+        result = dataforseo.fetch_serp(keyword, location, device=device)
+    if not result.get("error"):
+        result["_source"] = "dataforseo"
+        result["_device"] = device
+        return result
+    dfs_error = result["error"]
+
+    result = semrush.fetch_serp(keyword, location)
+    if not result.get("error"):
+        result["_source"] = "semrush"
+        result["_device"] = "desktop"
+        return result
+    return {"error": f"dataforseo: {dfs_error}; semrush: {result['error']}"}
+
+
+def provider_status() -> dict:
+    """Live health of both providers, for /keywords/provider-status. Cached
+    for 5 minutes so page loads don't burn two extra HTTP calls each."""
+    global _STATUS_CACHE, _STATUS_CACHE_AT
+    if _STATUS_CACHE is not None and time.monotonic() - _STATUS_CACHE_AT < _STATUS_CACHE_SECONDS:
+        return _STATUS_CACHE
+
+    sem = semrush.health_check()
+    dfs = dataforseo.health_check()
+    _STATUS_CACHE = {
+        # Original booleans kept as "credentials present" for compatibility.
+        "semrush": sem["configured"],
+        "dataforseo": dfs["configured"],
+        "any_configured": sem["configured"] or dfs["configured"],
+        # Live state: credentials actually work right now.
+        "semrush_ok": sem["ok"],
+        "dataforseo_ok": dfs["ok"],
+        "semrush_detail": sem["detail"],
+        "dataforseo_detail": dfs["detail"],
+        "any_working": sem["ok"] or dfs["ok"],
+    }
+    _STATUS_CACHE_AT = time.monotonic()
+    return _STATUS_CACHE
+
+
+_STATUS_CACHE: dict | None = None
+_STATUS_CACHE_AT = 0.0
+_STATUS_CACHE_SECONDS = 300
+
+
+def compute_trend(snapshots: list) -> tuple[str, str]:
+    """
+    snapshots: KeywordSnapshot ORM rows for one tracked keyword, any order.
+
+    Rule: compare the latest snapshot against the most recent prior snapshot
+    that is at least TREND_MIN_GAP_DAYS old, using volume (falls back to SERP
+    position if volume is missing on either side). >10% improvement is
+    "rising", >10% decline is "falling", otherwise "stable". Fewer than two
+    snapshots, or no snapshot old enough to diff against, means there is
+    nothing to compare -- returned as "stable" with confidence
+    "insufficient_data" so the frontend can distinguish it from a real "stable".
+    """
+    ordered = sorted(snapshots, key=lambda s: s.fetched_at, reverse=True)
+    if len(ordered) < 2:
+        return "stable", "insufficient_data"
+
+    latest = ordered[0]
+    baseline = next(
+        (s for s in ordered[1:] if (latest.fetched_at - s.fetched_at).days >= TREND_MIN_GAP_DAYS),
+        None,
+    )
+    if baseline is None:
+        return "stable", "insufficient_data"
+
+    if latest.volume is not None and baseline.volume:
+        change = (latest.volume - baseline.volume) / baseline.volume
+    elif latest.position is not None and baseline.position:
+        # Lower position number is a better rank, so invert the sign.
+        change = (baseline.position - latest.position) / baseline.position
+    else:
+        return "stable", "insufficient_data"
+
+    if change > TREND_THRESHOLD_PCT:
+        return "rising", "computed"
+    if change < -TREND_THRESHOLD_PCT:
+        return "falling", "computed"
+    return "stable", "computed"
