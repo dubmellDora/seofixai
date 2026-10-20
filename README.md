@@ -153,3 +153,8 @@ Proprietary — all rights reserved. Not an open-source project.
 
 Internal project for now — not accepting external contributions or PRs
 at this stage.
+
+After cloning, run `git config core.hooksPath .githooks` once to enable
+the repo's local hooks (currently just a pre-push check that the active
+`gh` CLI account matches the account this repo is scoped to). This is a
+local setting that doesn't carry over from the clone automatically.

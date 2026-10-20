@@ -1,0 +1,25 @@
+#!/bin/sh
+# Refuses to push from this repo unless the active `gh` CLI account is the
+# one this repo is scoped to. This is a local trip-wire, not the real
+# access control -- the actual guarantee is that the GitHub repo is private
+# with only that account as a collaborator, so any other account's
+# credentials are rejected by GitHub itself regardless of this hook.
+#
+# Bypassable with `git push --no-verify` or if `gh` isn't installed/logged
+# in -- intentional convenience check, not a security boundary.
+
+EXPECTED_ACCOUNT="dubmellDora"
+
+if ! command -v gh >/dev/null 2>&1; then
+  exit 0
+fi
+
+ACTIVE_ACCOUNT=$(gh api user --jq .login 2>/dev/null)
+
+if [ -n "$ACTIVE_ACCOUNT" ] && [ "$ACTIVE_ACCOUNT" != "$EXPECTED_ACCOUNT" ]; then
+  echo "pre-push: refusing to push -- gh CLI is active as '$ACTIVE_ACCOUNT', not '$EXPECTED_ACCOUNT'." >&2
+  echo "Run: gh auth switch -h github.com -u $EXPECTED_ACCOUNT" >&2
+  exit 1
+fi
+
+exit 0
