@@ -221,7 +221,7 @@ def test_plugin_download_redirects_to_latest_release():
         resp = routes.download_wp_plugin()
     assert resp.status_code == 302
     assert resp.headers["location"] == (
-        "https://github.com/dubmellDora/seofixai/releases/latest/download/ai-seo-connector.zip"
+        "https://github.com/dubmellDora/ai-seo-connector/releases/latest/download/ai-seo-connector.zip"
     )
     paths = {r.path for r in routes.router.routes}
     assert {"/downloads/ai-seo-connector"} <= paths

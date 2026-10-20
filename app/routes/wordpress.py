@@ -20,11 +20,12 @@ from ..services import content_optimizer, failure_log
 logger = logging.getLogger("wordpress_deploy")
 router = APIRouter()
 
-# The plugin's released zip asset is attached to GitHub releases of this repo,
-# so the download/update-check below always serves whatever was most recently
-# tagged -- attach an "ai-seo-connector.zip" asset to each release for this to
-# keep working.
-PLUGIN_REPO = "dubmellDora/seofixai"
+# The plugin lives in its own public repo (not this one, which is private) so
+# its auto-updater and this download route can read GitHub's release API
+# without needing a token embedded in code that ships to every connected
+# WordPress site. Its own release workflow attaches the "ai-seo-connector.zip"
+# asset automatically on a version bump.
+PLUGIN_REPO = "dubmellDora/ai-seo-connector"
 PLUGIN_ASSET = "ai-seo-connector.zip"
 PLUGIN_LATEST_API = f"https://api.github.com/repos/{PLUGIN_REPO}/releases/latest"
 # Fallback when GitHub's API can't be reached: still gets the user the newest

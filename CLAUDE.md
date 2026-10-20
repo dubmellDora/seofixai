@@ -31,9 +31,12 @@ repo. Read this before making non-trivial changes.
   new one — they follow a consistent shape (docstring explaining the *why*,
   a `DEFAULT_DB_PATH`/`DB_PATH` constant, defaults chosen so existing rows
   keep their current behavior).
-- `ai-seo-connector/` — the companion WordPress plugin (PHP), kept in this
-  same repo. It talks to the app over a small REST tool-dispatcher API
-  (`app/wordpress.py`); its own `README.md` covers the plugin side in detail.
+- The companion WordPress plugin (PHP) lives in its own repo,
+  `dubmellDora/ai-seo-connector` (public, separate from this private repo so
+  its auto-updater never needs a token embedded in code that ships to every
+  connected WordPress site). It talks to this app over a small REST
+  tool-dispatcher API (`app/wordpress.py`); `PLUGIN_REPO` in
+  `app/routes/wordpress.py` points at it.
 
 ## Conventions worth knowing before you change code
 
