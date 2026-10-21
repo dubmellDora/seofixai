@@ -118,6 +118,38 @@ def test_build_auth_url_includes_offline_and_consent(monkeypatch):
     assert kwargs["prompt"] == "consent"
 
 
+def test_build_auth_url_disables_pkce_autogeneration(monkeypatch):
+    # Regression test: google-auth-oauthlib defaults autogenerate_code_verifier
+    # to True (PKCE). build_auth_url's Flow is discarded right after this call
+    # (see its docstring), so a code_verifier generated here would be lost --
+    # exchange_code_for_tokens() builds an unrelated Flow later with no way to
+    # recover it, and Google's token endpoint then rejects the exchange with
+    # "(invalid_grant) Missing code verifier" (seen in production 2026-10-21,
+    # surfaced to users as a 502 on /gsc/callback).
+    _set_oauth_env(monkeypatch)
+    fake_flow = MagicMock()
+    fake_flow.authorization_url.return_value = ("https://accounts.google.com/o/oauth2/auth?state=abc", "abc")
+    with patch.object(gsc.Flow, "from_client_config", return_value=fake_flow) as from_client_config:
+        gsc.build_auth_url("signed-state-value")
+    _, kwargs = from_client_config.call_args
+    assert kwargs["autogenerate_code_verifier"] is False
+
+
+def test_exchange_code_for_tokens_disables_pkce_autogeneration(monkeypatch):
+    # Same regression as test_build_auth_url_disables_pkce_autogeneration,
+    # checked on the exchange side: this Flow must not autogenerate a
+    # code_verifier of its own either, since it has no way to match whatever
+    # (now-discarded) code_verifier the original authorization request used.
+    _set_oauth_env(monkeypatch)
+    fake_flow = MagicMock()
+    fake_flow.credentials = _fake_creds()
+    with patch.object(gsc.Flow, "from_client_config", return_value=fake_flow) as from_client_config, \
+         patch.object(gsc, "_account_email", return_value="agency@example.com"):
+        gsc.exchange_code_for_tokens("auth-code")
+    _, kwargs = from_client_config.call_args
+    assert kwargs["autogenerate_code_verifier"] is False
+
+
 def test_exchange_code_for_tokens_success(monkeypatch):
     _set_oauth_env(monkeypatch)
     fake_flow = MagicMock()

@@ -183,8 +183,15 @@ def build_auth_url(state: str) -> str:
 
     A fresh Flow is built here and discarded -- per Task 3's design, the
     Flow object is never kept alive between requests, only the opaque
-    `state` string round-trips through the redirect."""
-    flow = Flow.from_client_config(_client_config(), scopes=SCOPES, state=state)
+    `state` string round-trips through the redirect. autogenerate_code_verifier
+    must stay off: google-auth-oauthlib defaults it on (PKCE), which would
+    bind this request to a code_verifier that dies with this Flow object --
+    exchange_code_for_tokens() builds its own fresh Flow with no way to
+    recover it, and Google rejects the exchange with "Missing code
+    verifier"."""
+    flow = Flow.from_client_config(
+        _client_config(), scopes=SCOPES, state=state, autogenerate_code_verifier=False
+    )
     flow.redirect_uri = os.environ[_ENV_REDIRECT_URI]
     auth_url, _ = flow.authorization_url(
         access_type="offline",
@@ -212,7 +219,7 @@ def exchange_code_for_tokens(code: str) -> GSCResult:
     /gsc/connect, per the same "don't keep Flow alive between requests"
     rule build_auth_url follows."""
     try:
-        flow = Flow.from_client_config(_client_config(), scopes=SCOPES)
+        flow = Flow.from_client_config(_client_config(), scopes=SCOPES, autogenerate_code_verifier=False)
         flow.redirect_uri = os.environ[_ENV_REDIRECT_URI]
         flow.fetch_token(code=code)
     except Exception as e:
