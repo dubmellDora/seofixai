@@ -99,6 +99,7 @@ jobs:
         run: |
           TAG="db-backup-$(date +%F)"
           gh release create "$TAG" "backup/seo_automation-$(date +%F).db" \
+            --repo "${{ github.repository }}" \
             --title "$TAG" \
             --notes "Automated daily backup of seo_automation.db"
 
@@ -106,10 +107,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release list --limit 200 --json tagName,createdAt \
+          gh release list --repo "${{ github.repository }}" --limit 200 --json tagName,createdAt \
             --jq '[.[] | select(.tagName | startswith("db-backup-"))] | sort_by(.createdAt) | reverse | .[14:] | .[].tagName' \
           | while read -r OLD_TAG; do
               [ -n "$OLD_TAG" ] || continue
               echo "Deleting old backup: $OLD_TAG"
-              gh release delete "$OLD_TAG" --yes --cleanup-tag
+              gh release delete "$OLD_TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
             done
