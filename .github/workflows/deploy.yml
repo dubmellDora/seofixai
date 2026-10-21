@@ -88,7 +88,12 @@ jobs:
               # Keep the image that is running now under a second name. Without this,
               # `docker image prune` deletes it and there is nothing to roll back to.
               "sudo -u ec2-user docker tag seofixai-app:latest seofixai-app:previous || true",
-              "sudo -u ec2-user docker compose -f /opt/seo-automation/docker-compose.yml build",
+              # Fail fast if the image doesn't build. Without this check the script kept
+              # going, left the OLD app running, and the broken build was only caught
+              # ~2 minutes later by the health-check step (and disk was never the obvious
+              # cause: the real error -- 'No space left on device' -- was buried in pip's
+              # output, truncated by SSM's 24KB output cap on StandardOutputContent).
+              "sudo -u ec2-user docker compose -f /opt/seo-automation/docker-compose.yml build || { echo \"Image build FAILED - leaving the current app untouched\"; exit 1; }",
               # Stop the OLD app so the migration is the only connection to the database.
               # (Migrations run beside a live app were being lost: 025 vanished twice.)
               "sudo -u ec2-user docker compose -f /opt/seo-automation/docker-compose.yml stop app",
