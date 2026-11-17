@@ -4,6 +4,7 @@ google-genai
 python-dotenv
 uvicorn[standard]
 sqlalchemy
+alembic
 psycopg2-binary
 httpx
 beautifulsoup4
@@ -19,3 +20,4 @@ cryptography  # Fernet encryption for WordPress API tokens at rest (WP_TOKEN_KEY
 google-auth
 google-auth-oauthlib
 google-api-python-client
+argon2-cffi  # Argon2id password hashing (S1-02)

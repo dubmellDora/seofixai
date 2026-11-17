@@ -1,12 +1,16 @@
+import os
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Primary application database (SQLite for local dev)
-# To migrate to PostgreSQL: replace this URL with a postgresql:// connection string
-# and remove connect_args — all models use standard SQLAlchemy types with no SQLite-isms
-DATABASE_URL = "sqlite:///seo_automation.db"
+# Connection string lives in the environment (see .env.example). Defaults to
+# the local SQLite file only so ad-hoc scripts/tests that don't set it up
+# still work; real runs (app, alembic, docker-compose) always set DATABASE_URL.
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///seo_automation.db")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
