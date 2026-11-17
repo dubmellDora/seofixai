@@ -1,0 +1,29 @@
+{% extends "auth/layout.html" %}
+{% block title %}Create account - SeoFixAI{% endblock %}
+{% block subtitle %}Create your agency workspace{% endblock %}
+{% block body %}
+<form method="post" action="/register" class="space-y-4">
+  <label class="block text-sm font-medium">Agency name
+    <input name="agency_name" required value="{{ agency_name or '' }}"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <label class="block text-sm font-medium">Your name
+    <input name="display_name" required autocomplete="name" value="{{ display_name or '' }}"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <label class="block text-sm font-medium">Email
+    <input name="email" type="email" required autocomplete="username" value="{{ email or '' }}"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <label class="block text-sm font-medium">Password (10+ characters)
+    <input name="password" type="password" required minlength="10" autocomplete="new-password"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <label class="block text-sm font-medium">Repeat password
+    <input name="password2" type="password" required minlength="10" autocomplete="new-password"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <button type="submit" class="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Create account</button>
+</form>
+{% endblock %}
+{% block footer %}Already registered? <a class="text-indigo-600 underline" href="/login">Log in</a>{% endblock %}

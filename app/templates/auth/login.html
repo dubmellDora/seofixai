@@ -1,0 +1,18 @@
+{% extends "auth/layout.html" %}
+{% block title %}Log in - SeoFixAI{% endblock %}
+{% block subtitle %}{% if portal == "admin" %}Staff sign-in{% else %}Log in to your agency workspace{% endif %}{% endblock %}
+{% block body %}
+<form method="post" action="/login" class="space-y-4">
+  <input type="hidden" name="next" value="{{ next or '' }}">
+  <label class="block text-sm font-medium">Email
+    <input name="email" type="email" required autofocus autocomplete="username" value="{{ email or '' }}"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <label class="block text-sm font-medium">Password
+    <input name="password" type="password" required autocomplete="current-password"
+           class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </label>
+  <button type="submit" class="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Log in</button>
+</form>
+{% endblock %}
+{% block footer %}{% if portal != "admin" and registration_enabled %}No account? <a class="text-indigo-600 underline" href="/register">Create one</a>{% endif %}{% endblock %}

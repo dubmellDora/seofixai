@@ -96,5 +96,13 @@
 
   </nav>
 
+  {% if request is defined and request.state is defined and request.state.user %}
+  <form method="post" action="/logout" style="padding:10px 12px;border-top:1px solid #e2e8f0;">
+    <div style="font-size:12px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ request.state.user.display_name }}</div>
+    <div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;">{{ request.state.user.agency_name or "Platform staff" }}</div>
+    <button type="submit" style="font-size:12px;color:#4f46e5;background:none;border:0;padding:0;cursor:pointer;">Log out</button>
+  </form>
+  {% endif %}
+
 </div><!-- /sidebar-inner -->
 </aside>

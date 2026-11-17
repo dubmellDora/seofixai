@@ -5,8 +5,10 @@ load_dotenv()
 
 from fastapi import FastAPI
 
-from . import build_info, logging_setup, schema_check, scheduler as job_scheduler
+from . import build_info, host_routing, logging_setup, schema_check, scheduler as job_scheduler
+from .auth import install_auth_guard
 from .database import Base, engine
+from .routes import auth as auth_routes
 from .routes import audit, competitors, crawl, jobs, keywords, links, onpage_semrush, optimizer, projects, search_console, security, settings, suggestions, visibility, wordpress
 
 logging_setup.configure_logging()   # timestamps + levels on every WARNING and above, before anything below can log
@@ -28,6 +30,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Host guard (plan S0-04). Installed always, but does nothing unless
+# HOST_ENFORCEMENT is on, so existing deployments behave exactly as before.
+# Auth guard (plan S1-04). Same pattern: always installed, enforces nothing until
+# AUTH_ENFORCEMENT=1, so existing deployments behave exactly as before.
+# ORDER MATTERS: Starlette runs the LAST-added middleware FIRST. The host guard is
+# added last so an unknown host is rejected (421) before any login lookup happens.
+install_auth_guard(app)
+host_routing.install_host_guard(app, host_routing.load_host_config())
+
+app.include_router(auth_routes.router)
 app.include_router(projects.router)
 app.include_router(crawl.router)
 app.include_router(audit.router)
@@ -43,6 +55,13 @@ app.include_router(competitors.router)
 app.include_router(optimizer.router)
 app.include_router(links.router)
 app.include_router(search_console.router)
+
+
+@app.get("/health")
+def health():
+    """Minimal liveness check: the process is up and answering. Deliberately
+    touches no database and reveals nothing (D-009: /health is public)."""
+    return {"status": "ok"}
 
 
 @app.get("/version")

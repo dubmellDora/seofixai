@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 def _utcnow():
     return datetime.now(timezone.utc)
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+import uuid
+
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -878,3 +880,112 @@ class SuggestionOptimization(Base):
     validation_status = Column(String)                 # ok | warning | needs_human_verification | blocked | error
     validation_json = Column(JSON)                     # {"status", "checks": [{"name", "status", "message"}]}
     created_at = Column(DateTime, default=_utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Accounts (Sprint 1, S1-01). Decisions: D-011 (role model), D-012 (404 not 403).
+#
+# An Agency is the customer account (the tenant). Users belong to an agency.
+# Later tasks add agency_id to Project so every row traces back to one agency.
+# ---------------------------------------------------------------------------
+
+PLATFORM_ROLES = ("customer", "platform_admin", "support_admin")
+AGENCY_ROLES = ("owner", "member")
+
+
+class Agency(Base):
+    __tablename__ = "agencies"
+
+    # UUIDs, not counters: ids appear in URLs and cannot be guessed or counted.
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    slug = Column(String, nullable=False, unique=True)  # lowercase url-safe name
+    is_active = Column(Boolean, nullable=False, default=True)  # False = suspended
+    # Branding (shown on client-facing reports later); all optional.
+    logo_url = Column(String)
+    brand_color = Column(String)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    users = relationship("User", back_populates="agency")
+
+    __table_args__ = (
+        CheckConstraint("slug = lower(slug)", name="ck_agencies_slug_lowercase"),
+    )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    # NULL only for platform staff, who belong to no customer agency.
+    agency_id = Column(Uuid, ForeignKey("agencies.id"), index=True)
+    # Always stored lowercase and trimmed (see ck_users_email_lowercase).
+    email = Column(String, nullable=False, unique=True)
+    display_name = Column(String, nullable=False)
+    # Argon2 hash only. Never a plaintext password (S1-02).
+    password_hash = Column(String, nullable=False)
+    # Two independent fields (D-011). No request may ever set platform_role.
+    platform_role = Column(String, nullable=False, default="customer")
+    agency_role = Column(String)  # owner | member; NULL for platform staff
+    is_active = Column(Boolean, nullable=False, default=True)  # False = deactivated
+    email_verified_at = Column(DateTime)  # NULL = not verified yet
+    last_login_at = Column(DateTime)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    agency = relationship("Agency", back_populates="users")
+
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="ck_users_email_lowercase"),
+        CheckConstraint(
+            "platform_role IN ('customer', 'platform_admin', 'support_admin')",
+            name="ck_users_platform_role",
+        ),
+        CheckConstraint(
+            "agency_role IS NULL OR agency_role IN ('owner', 'member')",
+            name="ck_users_agency_role",
+        ),
+        # A customer must belong to an agency and have a role inside it.
+        CheckConstraint(
+            "platform_role <> 'customer' OR (agency_id IS NOT NULL AND agency_role IS NOT NULL)",
+            name="ck_users_customer_has_agency",
+        ),
+    )
+
+
+class UserSession(Base):
+    """One logged-in browser (S1-03a). The cookie holds a random token; only its
+    SHA-256 hash is stored here, so a leaked database cannot hijack sessions."""
+
+    __tablename__ = "user_sessions"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String, nullable=False, unique=True)  # sha256 hex of cookie token
+    csrf_token = Column(String, nullable=False)  # random per session (used in S1-03c)
+    host_kind = Column(String, nullable=False)  # 'app' | 'admin': which host issued it
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    last_seen_at = Column(DateTime, nullable=False, default=_utcnow)
+    expires_at = Column(DateTime, nullable=False)  # absolute limit, never extended
+    revoked_at = Column(DateTime)  # set by logout / "log out everywhere"
+
+    user = relationship("User")
+
+    __table_args__ = (
+        CheckConstraint("host_kind IN ('app', 'admin')", name="ck_user_sessions_host_kind"),
+    )
+
+
+class LoginAttempt(Base):
+    """One failed login or reset request (S1-03d), used for rate limiting.
+
+    The email is stored as a SHA-256 hash of the normalized text, so junk or
+    personal data typed into the form is never kept readable."""
+
+    __tablename__ = "login_attempts"
+
+    id = Column(Integer, primary_key=True)
+    email_hash = Column(String, nullable=False, index=True)
+    ip = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow, index=True)

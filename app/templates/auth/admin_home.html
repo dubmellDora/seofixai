@@ -1,0 +1,9 @@
+{% extends "auth/layout.html" %}
+{% block title %}Admin - SeoFixAI{% endblock %}
+{% block subtitle %}Signed in as {{ user.display_name }} ({{ user.platform_role }}){% endblock %}
+{% block body %}
+<p class="text-sm text-slate-600 mb-4">Admin portal placeholder. Customer management, settings and monitoring pages are built in the admin sprint.</p>
+<form method="post" action="/logout">
+  <button type="submit" class="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Log out</button>
+</form>
+{% endblock %}
