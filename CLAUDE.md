@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+> **MANDATORY FIRST:** read `Mandatory/README.md` (rules, implementation state,
+> decisions, per-session logs) and follow it. Every session creates its own file in
+> `Mandatory/SESSIONS/` and appends a summary to `Mandatory/HISTORY_LOGS.md`.
+
 Engineering orientation for anyone (human or Claude Code) picking up this
 repo. Read this before making non-trivial changes.
 
